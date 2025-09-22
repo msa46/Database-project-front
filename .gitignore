@@ -1,17 +1,6 @@
-# Dependencies
-node_modules/
-/.pnp
-.pnp.js
-
-# Testing
-/coverage
-
-# Production
-/build
-/dist
-
-# Misc
+node_modules
 .DS_Store
+.env
 .env.local
 .env.development.local
 .env.test.local
@@ -70,3 +59,13 @@ pnpm-lock.yaml
 
 *.code-workspace
 
+.DS_Store
+dist
+dist-ssr
+*.local
+count.txt
+.nitro
+.tanstack
+
+
+.vscode/
