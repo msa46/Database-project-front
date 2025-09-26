@@ -13,6 +13,11 @@ const schema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
   confirm_password: z.string().min(6, { message: 'Confirm password must be at least 6 characters' }),
+  birthdate: z.string().optional(),
+  address: z.string().min(1, { message: 'Address is required' }),
+  postalCode: z.string().min(1, { message: 'Postal code is required' }),
+  phone: z.string().min(1, { message: 'Phone number is required' }),
+  gender: z.string().min(1, { message: 'Gender is required' }),
 }).refine((data) => data.password === data.confirm_password, {
   message: "Passwords don't match",
   path: ["confirm_password"],
@@ -35,7 +40,16 @@ export function SignupForm() {
     setError('');
     setSuccess('');
     try {
-      const response = await signup(data);
+      const signupData  = data;
+      
+      // Convert birthdate from date string to datetime object if it exists
+      if (signupData.birthdate) {
+        const birthdate = new Date(signupData.birthdate);
+        // Format as ISO string to get datetime representation
+        signupData.birthdate = birthdate.toISOString();
+      }
+      
+      const response = await signup(signupData);
       storeToken(response.token);
       setSuccess('Signup successful! Welcome aboard.');
       form.reset();
@@ -102,6 +116,71 @@ export function SignupForm() {
                   <FormLabel>Confirm Password</FormLabel>
                   <FormControl>
                     <Input type="password" placeholder="Confirm Password" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="birthdate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Birthdate (Optional)</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Your address" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="postalCode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Postal Code</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Your postal code" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Your phone number" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="gender"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Gender</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Male/Female" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

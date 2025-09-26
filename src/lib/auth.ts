@@ -9,7 +9,11 @@ export interface SignupRequest {
     username: string;
     email: string;
     password: string;
-    confirm_password: string;
+    birthdate?: string;
+    address: string;
+    postalCode: string;
+    phone: string;
+    Gender: string;
 }
 
 export interface AuthResponse {
