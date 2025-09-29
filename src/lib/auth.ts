@@ -13,7 +13,7 @@ export interface SignupRequest {
     address: string;
     postalCode: string;
     phone: string;
-    Gender: string;
+    gender: string;
 }
 
 export interface AuthResponse {

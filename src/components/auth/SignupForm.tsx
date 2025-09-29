@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { faker } from '@faker-js/faker';
 
 const schema = z.object({
   username: z.string().min(1, { message: 'Username is required' }),
@@ -58,6 +59,26 @@ export function SignupForm() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const generateFakeData = () => {
+    const fakePassword = faker.internet.password({ length: 10, memorable: true });
+    const fakeData = {
+      username: faker.internet.username(),
+      email: faker.internet.email(),
+      password: fakePassword,
+      confirm_password: fakePassword,
+      birthdate: faker.date.birthdate().toISOString().split('T')[0], // Format as YYYY-MM-DD for date input
+      address: faker.location.streetAddress(),
+      postalCode: faker.location.zipCode(),
+      phone: faker.phone.number(),
+      gender: faker.person.gender(),
+    };
+    
+    // Set all form values
+    Object.entries(fakeData).forEach(([key, value]) => {
+      form.setValue(key as keyof FormData, value);
+    });
   };
 
   return (
@@ -186,9 +207,14 @@ export function SignupForm() {
                 </FormItem>
               )}
             />
-            <Button type="submit" disabled={loading} className="w-full">
-              {loading ? 'Signing up...' : 'Sign Up'}
-            </Button>
+            <div className="flex gap-2">
+              <Button type="submit" disabled={loading} className="flex-1">
+                {loading ? 'Signing up...' : 'Sign Up'}
+              </Button>
+              <Button type="button" onClick={generateFakeData} variant="outline" className="flex-1">
+                Fake Data
+              </Button>
+            </div>
           </form>
         </Form>
         {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
