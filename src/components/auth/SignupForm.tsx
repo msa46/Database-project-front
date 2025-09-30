@@ -21,7 +21,7 @@ const schema = z.object({
   user_type: z.enum(['customer', 'employee', 'delivery_person'], {
     message: 'Please select a user type'
   }),
-  birthdate: z.string().datetime().optional(),
+  birthdate: z.string().date().optional(),
   address: z.string().min(1, { message: 'Address is required' }),
   postalCode: z.string().min(1, { message: 'Postal code is required' }),
   phone: z.string().min(1, { message: 'Phone number is required' }),
@@ -109,7 +109,7 @@ export function SignupForm() {
     form.setValue('username', faker.internet.username());
     form.setValue('email', faker.internet.email());
     form.setValue('password', fakePassword);
-    form.setValue('confirm_password', fakePassword);
+    form.setValue('confirm_password', fakePassword);    
     form.setValue('birthdate', faker.date.birthdate().toISOString().split('T')[0]);
     form.setValue('address', faker.location.streetAddress());
     form.setValue('postalCode', faker.location.zipCode());
