@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { login, storeToken } from '@/lib/auth';
+import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -19,6 +20,7 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const navigate = useNavigate();
 
   const form = useForm<FormData>({
     // @ts-ignore: Zod version compatibility issue
@@ -34,6 +36,11 @@ export function LoginForm() {
       storeToken(response.token);
       setSuccess('Login successful!');
       form.reset();
+      
+      // Redirect to dashboard after successful login
+      setTimeout(() => {
+        navigate({ to: '/dashboard' });
+      }, 1000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {

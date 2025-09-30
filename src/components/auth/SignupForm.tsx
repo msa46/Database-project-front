@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { signup, storeToken } from '@/lib/auth';
+import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -38,6 +39,8 @@ export function SignupForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [fakeDataApplied, setFakeDataApplied] = useState(false);
+  const navigate = useNavigate();
 
   const form = useForm<FormData>({
     resolver: (data, context, options) => {
@@ -54,6 +57,9 @@ export function SignupForm() {
         };
       }
     },
+    defaultValues: {
+      user_type: 'customer'
+    }
   });
 
   const onSubmit = async (data: FormData) => {
@@ -74,6 +80,11 @@ export function SignupForm() {
       storeToken(response.token);
       setSuccess('Signup successful! Welcome aboard.');
       form.reset();
+      
+      // Redirect to dashboard after successful signup
+      setTimeout(() => {
+        navigate({ to: '/dashboard' });
+      }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
@@ -85,35 +96,37 @@ export function SignupForm() {
     const fakePassword = faker.internet.password({ length: 10, memorable: true });
     const userType = faker.helpers.arrayElement(['customer', 'employee', 'delivery_person']);
     
-    const fakeData: any = {
-      username: faker.internet.username(),
-      email: faker.internet.email(),
-      password: fakePassword,
-      confirm_password: fakePassword,
-      birthdate: faker.date.birthdate().toISOString().split('T')[0], // Format as YYYY-MM-DD for date input
-      address: faker.location.streetAddress(),
-      postalCode: faker.location.zipCode(),
-      phone: faker.phone.number(),
-      gender: faker.person.gender(),
-      user_type: userType,
-    };
+    // Reset form first to clear all values
+    form.reset();
+    
+    // Set the user type first to ensure conditional rendering works properly
+    form.setValue('user_type', userType);
+    
+    // Force a re-render by updating the fakeDataApplied state
+    setFakeDataApplied(!fakeDataApplied);
+    
+    // Set basic user data
+    form.setValue('username', faker.internet.username());
+    form.setValue('email', faker.internet.email());
+    form.setValue('password', fakePassword);
+    form.setValue('confirm_password', fakePassword);
+    form.setValue('birthdate', faker.date.birthdate().toISOString().split('T')[0]);
+    form.setValue('address', faker.location.streetAddress());
+    form.setValue('postalCode', faker.location.zipCode());
+    form.setValue('phone', faker.phone.number());
+    form.setValue('gender', faker.person.gender());
     
     // Add employee specific data if userType is employee
     if (userType === 'employee') {
-      fakeData.position = faker.helpers.arrayElement(['Manager', 'Specialist', 'Associate', 'Director']);
-      fakeData.salary = faker.number.int({ min: 30000, max: 100000 });
+      form.setValue('position', faker.helpers.arrayElement(['Manager', 'Specialist', 'Associate', 'Director']));
+      form.setValue('salary', faker.number.int({ min: 30000, max: 100000 }));
     }
     
     // Add delivery person specific data if userType is delivery_person
     if (userType === 'delivery_person') {
-      fakeData.position = faker.helpers.arrayElement(['Senior Delivery', 'Junior Delivery', 'Delivery Specialist', 'Route Manager']);
-      fakeData.salary = faker.number.int({ min: 25000, max: 60000 });
+      form.setValue('position', faker.helpers.arrayElement(['Senior Delivery', 'Junior Delivery', 'Delivery Specialist', 'Route Manager']));
+      form.setValue('salary', faker.number.int({ min: 25000, max: 60000 }));
     }
-    
-    // Set all form values
-    Object.entries(fakeData).forEach(([key, value]) => {
-      form.setValue(key as keyof FormData, value as string);
-    });
   };
 
   return (
