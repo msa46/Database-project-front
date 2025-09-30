@@ -7,18 +7,26 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { faker } from '@faker-js/faker';
+import * as zod from 'zod';
 
 const schema = z.object({
   username: z.string().min(1, { message: 'Username is required' }),
   email: z.string().email({ message: 'Please enter a valid email address' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
   confirm_password: z.string().min(6, { message: 'Confirm password must be at least 6 characters' }),
-  birthdate: z.string().optional(),
+  user_type: z.enum(['customer', 'employee', 'delivery_person'], {
+    message: 'Please select a user type'
+  }),
+  birthdate: z.string().datetime().optional(),
   address: z.string().min(1, { message: 'Address is required' }),
   postalCode: z.string().min(1, { message: 'Postal code is required' }),
   phone: z.string().min(1, { message: 'Phone number is required' }),
   gender: z.string().min(1, { message: 'Gender is required' }),
+  position: z.string().optional(),
+  salary: z.number().optional(),
 }).refine((data) => data.password === data.confirm_password, {
   message: "Passwords don't match",
   path: ["confirm_password"],
@@ -32,8 +40,20 @@ export function SignupForm() {
   const [success, setSuccess] = useState('');
 
   const form = useForm<FormData>({
-    // @ts-ignore: Zod version compatibility issue
-    resolver: zodResolver(schema),
+    resolver: (data, context, options) => {
+      const result = schema.safeParse(data);
+      if (result.success) {
+        return { values: result.data, errors: {} };
+      } else {
+        return {
+          values: {},
+          errors: result.error.issues.reduce((acc, issue) => {
+            acc[issue.path.join('.')] = { message: issue.message, type: 'validation' };
+            return acc;
+          }, {} as Record<string, any>)
+        };
+      }
+    },
   });
 
   const onSubmit = async (data: FormData) => {
@@ -41,7 +61,7 @@ export function SignupForm() {
     setError('');
     setSuccess('');
     try {
-      const signupData  = data;
+      const signupData = { ...data };
       
       // Convert birthdate from date string to datetime object if it exists
       if (signupData.birthdate) {
@@ -63,7 +83,9 @@ export function SignupForm() {
 
   const generateFakeData = () => {
     const fakePassword = faker.internet.password({ length: 10, memorable: true });
-    const fakeData = {
+    const userType = faker.helpers.arrayElement(['customer', 'employee', 'delivery_person']);
+    
+    const fakeData: any = {
       username: faker.internet.username(),
       email: faker.internet.email(),
       password: fakePassword,
@@ -73,11 +95,24 @@ export function SignupForm() {
       postalCode: faker.location.zipCode(),
       phone: faker.phone.number(),
       gender: faker.person.gender(),
+      user_type: userType,
     };
+    
+    // Add employee specific data if userType is employee
+    if (userType === 'employee') {
+      fakeData.position = faker.helpers.arrayElement(['Manager', 'Specialist', 'Associate', 'Director']);
+      fakeData.salary = faker.number.int({ min: 30000, max: 100000 });
+    }
+    
+    // Add delivery person specific data if userType is delivery_person
+    if (userType === 'delivery_person') {
+      fakeData.position = faker.helpers.arrayElement(['Senior Delivery', 'Junior Delivery', 'Delivery Specialist', 'Route Manager']);
+      fakeData.salary = faker.number.int({ min: 25000, max: 60000 });
+    }
     
     // Set all form values
     Object.entries(fakeData).forEach(([key, value]) => {
-      form.setValue(key as keyof FormData, value);
+      form.setValue(key as keyof FormData, value as string);
     });
   };
 
@@ -207,6 +242,74 @@ export function SignupForm() {
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="user_type"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>User Type</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex flex-col space-y-1"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="customer" id="customer" />
+                        <Label htmlFor="customer">Customer</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="employee" id="employee" />
+                        <Label htmlFor="employee">Employee</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="delivery_person" id="delivery_person" />
+                        <Label htmlFor="delivery_person">Delivery Person</Label>
+                      </div>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            {/* Employee and delivery person specific fields - conditionally rendered */}
+            {(form.watch('user_type') === 'employee' || form.watch('user_type') === 'delivery_person') && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="position"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Position</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Your position" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="salary"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Salary</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Your salary"
+                          {...field}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
+            
             <div className="flex gap-2">
               <Button type="submit" disabled={loading} className="flex-1">
                 {loading ? 'Signing up...' : 'Sign Up'}
