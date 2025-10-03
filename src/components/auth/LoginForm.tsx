@@ -32,8 +32,25 @@ export function LoginForm() {
     setError('');
     setSuccess('');
     try {
+      console.log('LoginForm: Submitting login form with data:', data);
       const response = await login(data);
-      storeToken(response.token);
+      console.log('LoginForm: Login response received:', response);
+      console.log('LoginForm: Token from response:', response.access_token);
+      
+      // Check if token was stored correctly
+      const storedToken = localStorage.getItem('auth_token');
+      console.log('LoginForm: Token retrieved from localStorage:', storedToken);
+      
+      // Manually set the access token cookie
+      document.cookie = `access_token=${response.access_token}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
+      console.log('LoginForm: Set cookie with domain attribute');
+      console.log('LoginForm: Document cookies after setting with domain:', document.cookie);
+      
+      // Also try without domain
+      document.cookie = `access_token=${response.access_token}; path=/; SameSite=Lax`;
+      console.log('LoginForm: Set cookie without domain attribute');
+      console.log('LoginForm: Document cookies after setting without domain:', document.cookie);
+      
       setSuccess('Login successful!');
       form.reset();
       
@@ -42,6 +59,7 @@ export function LoginForm() {
         navigate({ to: '/dashboard' });
       }, 1000);
     } catch (err) {
+      console.error('LoginForm: Login error:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
       setLoading(false);

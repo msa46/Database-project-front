@@ -67,6 +67,7 @@ export function SignupForm() {
     setError('');
     setSuccess('');
     try {
+      console.log('SignupForm: Submitting signup form with data:', data);
       const signupData = { ...data };
       
       // Convert birthdate from date string to datetime object if it exists
@@ -76,8 +77,15 @@ export function SignupForm() {
         signupData.birthdate = birthdate.toISOString();
       }
       
+      console.log('SignupForm: Processed signup data:', signupData);
       const response = await signup(signupData);
-      storeToken(response.token);
+      console.log('SignupForm: Signup response received:', response);
+      storeToken(response.access_token);
+      
+      // Manually set the access token cookie
+      document.cookie = `access_token=${response.access_token}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
+      console.log('SignupForm: Token stored and cookie set, document cookies after signup:', document.cookie);
+      
       setSuccess('Signup successful! Welcome aboard.');
       form.reset();
       
@@ -86,6 +94,7 @@ export function SignupForm() {
         navigate({ to: '/dashboard' });
       }, 1500);
     } catch (err) {
+      console.error('SignupForm: Signup error:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
       setLoading(false);
