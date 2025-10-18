@@ -43,20 +43,7 @@ export function SignupForm() {
   const navigate = useNavigate();
 
   const form = useForm<FormData>({
-    resolver: (data, context, options) => {
-      const result = schema.safeParse(data);
-      if (result.success) {
-        return { values: result.data, errors: {} };
-      } else {
-        return {
-          values: {},
-          errors: result.error.issues.reduce((acc, issue) => {
-            acc[issue.path.join('.')] = { message: issue.message, type: 'validation' };
-            return acc;
-          }, {} as Record<string, any>)
-        };
-      }
-    },
+    resolver: zodResolver(schema),
     defaultValues: {
       user_type: 'customer'
     }
@@ -67,24 +54,45 @@ export function SignupForm() {
     setError('');
     setSuccess('');
     try {
-      console.log('SignupForm: Submitting signup form with data:', data);
+      console.log('DEBUG: SignupForm - Submitting signup form with data:', JSON.stringify(data, null, 2));
       const signupData = { ...data };
       
       // Convert birthdate from date string to datetime object if it exists
       if (signupData.birthdate) {
         const birthdate = new Date(signupData.birthdate);
+        // Check if the date is valid
+        if (isNaN(birthdate.getTime())) {
+          throw new Error('Invalid birthdate provided');
+        }
         // Format as ISO string to get datetime representation
         signupData.birthdate = birthdate.toISOString();
       }
       
-      console.log('SignupForm: Processed signup data:', signupData);
+      // Ensure salary is a number if it exists
+      if (signupData.salary !== undefined && signupData.salary !== null) {
+        if (typeof signupData.salary !== 'number' || isNaN(signupData.salary)) {
+          throw new Error('Salary must be a valid number');
+        }
+      }
+      
+      // Validate employee/delivery_person specific fields
+      if (signupData.user_type === 'employee' || signupData.user_type === 'delivery_person') {
+        if (!signupData.position || signupData.position.trim() === '') {
+          throw new Error(`Position is required for ${signupData.user_type} accounts`);
+        }
+        if (signupData.salary === undefined || signupData.salary === null || signupData.salary <= 0) {
+          throw new Error(`A valid salary is required for ${signupData.user_type} accounts`);
+        }
+      }
+      
+      console.log('DEBUG: SignupForm - Processed signup data:', JSON.stringify(signupData, null, 2));
       const response = await signup(signupData);
-      console.log('SignupForm: Signup response received:', response);
+      console.log('DEBUG: SignupForm - Signup response received:', response);
       storeToken(response.access_token);
       
       // Manually set the access token cookie
       document.cookie = `access_token=${response.access_token}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
-      console.log('SignupForm: Token stored and cookie set, document cookies after signup:', document.cookie);
+      console.log('DEBUG: SignupForm - Token stored and cookie set, document cookies after signup:', document.cookie);
       
       setSuccess('Signup successful! Welcome aboard.');
       form.reset();
@@ -94,8 +102,31 @@ export function SignupForm() {
         navigate({ to: '/dashboard' });
       }, 1500);
     } catch (err) {
-      console.error('SignupForm: Signup error:', err);
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      console.error('DEBUG: SignupForm - Signup error:', err);
+      if (err instanceof Error) {
+        // Try to extract more detailed error information
+        if (err.message.includes('422')) {
+          setError('Invalid data provided. Please check all fields and try again.');
+        } else if (err.message.includes('400')) {
+          if (err.message.includes('Username already registered')) {
+            setError('This username is already taken. Please choose a different username.');
+          } else if (err.message.includes('Email already registered')) {
+            setError('This email is already registered. Please use a different email.');
+          } else if (err.message.includes('Position is required')) {
+            setError('Position is required for employee and delivery person accounts.');
+          } else if (err.message.includes('Salary is required')) {
+            setError('A valid salary is required for employee and delivery person accounts.');
+          } else {
+            setError(`Registration failed: ${err.message}`);
+          }
+        } else if (err.message.includes('Network error')) {
+          setError('Unable to connect to the server. Please check if the backend is running.');
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError('An unexpected error occurred during signup. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
