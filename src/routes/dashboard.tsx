@@ -4,6 +4,15 @@ import { useNavigate } from '@tanstack/react-router'
 import { isAuthenticated, getToken } from '../lib/auth'
 import { API_URL } from '../lib/api'
 import ky from 'ky'
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 export const Route = createFileRoute('/dashboard')({
   component: Dashboard,
@@ -98,10 +107,95 @@ function Dashboard() {
         
         {dashboardData && (
           <div className="mb-6">
-            <h2 className="text-xl font-semibold mb-2">Your Information</h2>
-            <pre className="bg-gray-100 p-4 rounded-lg overflow-auto">
-              {JSON.stringify(dashboardData, null, 2)}
-            </pre>
+            <h2 className="text-xl font-semibold mb-4">Your Pizzas</h2>
+            
+            {/* Try to extract pizzas from different possible locations in the data */}
+            {(() => {
+              let pizzas = [];
+              
+              // Check if pizzas is directly in the data
+              if (dashboardData.pizzas && Array.isArray(dashboardData.pizzas)) {
+                pizzas = dashboardData.pizzas;
+              }
+              // Check if data itself is an array of pizzas
+              else if (Array.isArray(dashboardData)) {
+                pizzas = dashboardData;
+              }
+              // Check if pizzas are nested in a data property
+              else if (dashboardData.data && Array.isArray(dashboardData.data)) {
+                pizzas = dashboardData.data;
+              }
+              // Check if pizzas are nested in other common properties
+              else if (dashboardData.items && Array.isArray(dashboardData.items)) {
+                pizzas = dashboardData.items;
+              }
+              // Check if pizzas are nested in results
+              else if (dashboardData.results && Array.isArray(dashboardData.results)) {
+                pizzas = dashboardData.results;
+              }
+              // Look for any array in the data that might contain pizzas
+              else {
+                for (const key in dashboardData) {
+                  if (Array.isArray(dashboardData[key]) && dashboardData[key].length > 0) {
+                    // Check if this array looks like it contains pizzas
+                    const firstItem = dashboardData[key][0];
+                    if (firstItem && typeof firstItem === 'object' &&
+                        (firstItem.name || firstItem.price || firstItem.size || firstItem.toppings)) {
+                      pizzas = dashboardData[key];
+                      break;
+                    }
+                  }
+                }
+              }
+              
+              return (
+                <Table>
+                  <TableCaption>List of your pizzas</TableCaption>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Size</TableHead>
+                      <TableHead>Toppings</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pizzas.length > 0 ? (
+                      pizzas.map((pizza: any, index: number) => (
+                        <TableRow key={pizza.id || index}>
+                          <TableCell className="font-medium">{pizza.id || index + 1}</TableCell>
+                          <TableCell>{pizza.name || 'N/A'}</TableCell>
+                          <TableCell>{pizza.description || 'N/A'}</TableCell>
+                          <TableCell>${pizza.price || '0.00'}</TableCell>
+                          <TableCell>{pizza.size || 'N/A'}</TableCell>
+                          <TableCell>
+                            {pizza.toppings && Array.isArray(pizza.toppings)
+                              ? pizza.toppings.join(', ')
+                              : pizza.toppings || 'N/A'
+                            }
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-4">
+                          No pizzas found. Check back later for delicious pizzas!
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              );
+            })()}
+            
+            <div className="mt-6">
+              <h2 className="text-xl font-semibold mb-4">Raw Dashboard Data</h2>
+              <pre className="bg-gray-100 p-4 rounded-lg overflow-auto text-sm">
+                {JSON.stringify(dashboardData, null, 2)}
+              </pre>
+            </div>
           </div>
         )}
         
