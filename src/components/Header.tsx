@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { isAuthenticated } from '@/lib/auth'
+import { DevModeToggle } from './DevModeToggle'
 
 export default function Header() {
   return (
@@ -23,6 +24,9 @@ export default function Header() {
           </>
         )}
       </nav>
+      <div className="flex items-center">
+        <DevModeToggle />
+      </div>
     </header>
   )
 }
