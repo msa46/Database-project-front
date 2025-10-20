@@ -31,35 +31,69 @@ export interface AuthResponse {
 }
 
 export async function login(request: LoginRequest): Promise<AuthResponse> {
-    console.log('[DEBUG] API_URL from auth module:', API_URL);
-    console.log('[DEBUG] Attempting login to:', `${API_URL}/auth/login`);
-    console.log('[DEBUG] Login request:', request);
-    
-    const response = await ky.post(`${API_URL}/auth/login`, {
-        json: request,
-        credentials: 'include',
-    });
+ // Check if we're in development mode - if so, return mock response
+ const isDevMode = import.meta.env.MODE === 'development' || import.meta.env.VITE_DEV_MODE === 'true';
 
-    console.log('Login response status:', response.status);
-    console.log('Login response headers:', response.headers);
+  if (isDevMode) {
+    console.log('[DEV MODE] Mock login for development mode');
+    console.log('[DEV MODE] Username:', request.username_or_email);
 
-    if (!response.ok) {
-        throw new Error(`Login failed: ${response.statusText}`);
-    }
+    // Mock successful login response - use proper JWT-like format
+    const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+    const payload = btoa(JSON.stringify({
+      sub: '1',
+      username: request.username_or_email,
+      email: `${request.username_or_email}@example.com`,
+      exp: Math.floor(Date.now() / 1000) + 3600, // Expires in 1 hour
+      iat: Math.floor(Date.now() / 1000)
+    }));
+    const signature = 'mock_signature_for_development';
 
-    const data = await response.json<AuthResponse>();
-    console.log('Login response data:', data);
-    
-    // Store token in localStorage as backup but rely on cookies for authentication
-    if (data.access_token && typeof data.access_token === 'string' && data.access_token.trim() !== '') {
-        console.log('Storing token in localStorage');
-        storeToken(data.access_token);
-    } else {
-        console.error('Invalid token received from login response');
-        throw new Error('Invalid authentication token received');
-    }
-    
-    return data;
+    const mockResponse: AuthResponse = {
+      access_token: `${header}.${payload}.${signature}`,
+      token_type: 'Bearer',
+      expires_in: 3600,
+      user_id: 1,
+      username: request.username_or_email,
+      email: `${request.username_or_email}@example.com`
+    };
+
+    // Store the mock token
+    storeToken(mockResponse.access_token);
+
+    console.log('[DEV MODE] Mock login successful:', mockResponse);
+    return mockResponse;
+  }
+
+  console.log('[DEBUG] API_URL from auth module:', API_URL);
+  console.log('[DEBUG] Attempting login to:', `${API_URL}/auth/login`);
+  console.log('[DEBUG] Login request:', request);
+
+  const response = await ky.post(`${API_URL}/auth/login`, {
+    json: request,
+    credentials: 'include',
+  });
+
+  console.log('Login response status:', response.status);
+  console.log('Login response headers:', response.headers);
+
+  if (!response.ok) {
+    throw new Error(`Login failed: ${response.statusText}`);
+  }
+
+  const data = await response.json<AuthResponse>();
+  console.log('Login response data:', data);
+
+  // Store token in localStorage as backup but rely on cookies for authentication
+  if (data.access_token && typeof data.access_token === 'string' && data.access_token.trim() !== '') {
+    console.log('Storing token in localStorage');
+    storeToken(data.access_token);
+  } else {
+    console.error('Invalid token received from login response');
+    throw new Error('Invalid authentication token received');
+  }
+
+  return data;
 }
 
 export async function signup(request: SignupRequest): Promise<AuthResponse> {
