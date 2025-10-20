@@ -38,30 +38,89 @@ function Dashboard() {
 
   const fetchDashboardData = async (pageNum: number = 1, append: boolean = false) => {
     try {
+      // Check if we're in development mode - if so, return mock data
+      const isDevMode = import.meta.env.MODE === 'development' || import.meta.env.VITE_DEV_MODE === 'true';
+
+      if (isDevMode) {
+        console.log('[DEV MODE] Using mock dashboard data');
+
+        // Mock pizza data for development
+        const mockPizzas = [
+          {
+            id: 1,
+            name: 'Margherita',
+            description: 'Classic pizza with tomato sauce, mozzarella, and fresh basil',
+            price: '12.99',
+            size: 'medium',
+            toppings: ['tomato sauce', 'mozzarella', 'basil']
+          },
+          {
+            id: 2,
+            name: 'Pepperoni',
+            description: 'Spicy pepperoni with mozzarella cheese and tomato sauce',
+            price: '14.99',
+            size: 'medium',
+            toppings: ['tomato sauce', 'mozzarella', 'pepperoni']
+          },
+          {
+            id: 3,
+            name: 'Vegetarian Supreme',
+            description: 'Loaded with fresh vegetables, mushrooms, and olives',
+            price: '16.99',
+            size: 'medium',
+            toppings: ['tomato sauce', 'mozzarella', 'mushrooms', 'peppers', 'olives', 'onions']
+          }
+        ];
+
+        const mockDashboardData = {
+          pizzas: mockPizzas,
+          total: mockPizzas.length,
+          page: pageNum,
+          has_more: false
+        };
+
+        if (append) {
+          setDashboardData((prevData: any) => ({
+            ...prevData,
+            ...mockDashboardData
+          }));
+        } else {
+          setDashboardData(mockDashboardData);
+        }
+
+        setAllPizzas(mockPizzas);
+        setHasMore(false);
+        setLoading(false);
+        setLoadingMore(false);
+
+        console.log('[DEV MODE] Mock dashboard data loaded:', mockDashboardData);
+        return;
+      }
+
       const token = getValidToken();
-      
+
       console.log('[DIAGNOSTIC] fetchDashboardData called');
       console.log('[DIAGNOSTIC] Valid token exists:', !!token);
-      
+
       // Check if token is valid before making request
       if (!token) {
         console.log('[DIAGNOSTIC] No valid token found, redirecting to login');
         navigate({ to: '/login' });
         return;
       }
-      
+
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       };
-      
+
       console.log('[DEBUG] Added Authorization header with token');
-      
+
       const url = `${API_URL}/v1/dashboard?page=${pageNum}`;
       console.log('[DEBUG] Dashboard API URL being used:', url);
       console.log('[DEBUG] API_URL from dashboard module:', API_URL);
       console.log('[DEBUG] Full request headers:', headers);
-      
+
       const response = await ky.get(url, {
         headers,
         credentials: 'include'

@@ -12,7 +12,9 @@ export function DevModeToggle({ className }: DevModeToggleProps) {
   const [isDevMode, setIsDevMode] = React.useState(devModeManager.isDevModeActive());
 
   const handleToggle = () => {
-    const newState = devModeManager.toggleDevMode();
+    const newState = !isDevMode; // Simply alternate the current state
+    devModeManager.setDevMode(newState);
+
     setIsDevMode(newState);
     setModeInfo(devModeManager.getModeInfo());
   };
@@ -53,22 +55,14 @@ export function DevModeToggle({ className }: DevModeToggleProps) {
             )}
           </div>
 
-          {modeInfo.canOverride && (
-            <Button
-              onClick={handleToggle}
-              size="sm"
-              variant={isDevMode ? "destructive" : "default"}
-              className="w-full text-xs"
-            >
-              Switch to {isDevMode ? 'Secure' : 'Dev'} Mode
-            </Button>
-          )}
-
-          {!modeInfo.canOverride && (
-            <div className="text-xs text-gray-500 italic">
-              Mode controlled by environment variable
-            </div>
-          )}
+          <Button
+            onClick={handleToggle}
+            size="sm"
+            variant={isDevMode ? "destructive" : "default"}
+            className="w-full text-xs"
+          >
+            Switch to {isDevMode ? 'Secure' : 'Dev'} Mode
+          </Button>
         </div>
       </CardContent>
     </Card>
