@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useOrder } from './OrderProvider'
 import type { PizzaItem } from './OrderProvider'
 import type { OrderData, BackendOrderRequest, MultiplePizzaOrderRequest } from '@/lib/types'
-import { submitOrderFlexible } from '@/lib/api'
+import { submitOrder } from '@/lib/api'
 import { useNavigate } from '@tanstack/react-router'
 import { getValidToken } from '@/lib/auth'
 
@@ -237,7 +237,7 @@ export const OrderReviewModal: React.FC<OrderReviewModalProps> = ({ isOpen, onCl
 
       // Submit order to the API with the correct request body structure
       console.log('[DEBUG] About to submit order with requestBody:', JSON.stringify(requestBody, null, 2))
-      const response = await submitOrderFlexible(requestBody as MultiplePizzaOrderRequest)
+      const response = await submitOrder(requestBody as MultiplePizzaOrderRequest)
 
       console.log('[DEBUG] Order submission response:', response)
       console.log('[DEBUG] Response success value:', response.success)

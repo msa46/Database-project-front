@@ -1,1 +1,0 @@
-"const http=require('http');const server=http.createServer((req,res)=>{res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Content-Type','application/json');res.end(JSON.stringify({success:true,token:'mock_jwt_token_12345',user:{id:1,username:'dev_user'},message:'Mock login successful'}));});server.listen(8000,()=>console.log('Mock server running on port 8000'));"  
