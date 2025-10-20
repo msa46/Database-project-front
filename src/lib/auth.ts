@@ -31,8 +31,9 @@ export interface AuthResponse {
 }
 
 export async function login(request: LoginRequest): Promise<AuthResponse> {
-    console.log('Attempting login to:', `${API_URL}/auth/login`);
-    console.log('Login request:', request);
+    console.log('[DEBUG] API_URL from auth module:', API_URL);
+    console.log('[DEBUG] Attempting login to:', `${API_URL}/auth/login`);
+    console.log('[DEBUG] Login request:', request);
     
     const response = await ky.post(`${API_URL}/auth/login`, {
         json: request,
@@ -62,8 +63,9 @@ export async function login(request: LoginRequest): Promise<AuthResponse> {
 }
 
 export async function signup(request: SignupRequest): Promise<AuthResponse> {
-    console.log('DEBUG: Attempting signup to:', `${API_URL}/auth/signup`);
-    console.log('DEBUG: API_URL from environment:', API_URL);
+    console.log('[DEBUG] API_URL from auth module:', API_URL);
+    console.log('[DEBUG] Attempting signup to:', `${API_URL}/auth/signup`);
+    console.log('[DEBUG] API_URL from environment:', API_URL);
     console.log('DEBUG: Current frontend origin:', window.location.origin);
     console.log('DEBUG: Signup request:', JSON.stringify(request, null, 2));
     
@@ -146,7 +148,13 @@ export function storeToken(token: string): void {
 }
 
 export function getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+    const token = localStorage.getItem(TOKEN_KEY);
+    console.log('[DEBUG] getToken called. Token exists:', !!token);
+    if (token) {
+        console.log('[DEBUG] Token length:', token.length);
+        console.log('[DEBUG] Token starts with:', token.substring(0, 10) + '...');
+    }
+    return token;
 }
 
 export function isAuthenticated(): boolean {
@@ -158,5 +166,30 @@ export function isAuthenticated(): boolean {
 }
 
 export function logout(): void {
+    console.log('[DEBUG] Logging out, removing token from localStorage')
     localStorage.removeItem(TOKEN_KEY);
+}
+
+export function isTokenExpired(): boolean {
+    const token = getToken();
+    if (!token) return true;
+    
+    try {
+        // Simple JWT token parsing to check expiration
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const currentTime = Date.now() / 1000;
+        return payload.exp < currentTime;
+    } catch (error) {
+        console.error('[DEBUG] Error parsing token:', error);
+        return true; // If we can't parse the token, assume it's expired
+    }
+}
+
+export function refreshTokenIfNeeded(): boolean {
+    if (isTokenExpired()) {
+        console.log('[DEBUG] Token is expired, logging out');
+        logout();
+        return false;
+    }
+    return true;
 }
