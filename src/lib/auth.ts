@@ -31,11 +31,11 @@ export interface AuthResponse {
 }
 
 export async function login(request: LoginRequest): Promise<AuthResponse> {
- // Check if we're in development mode - if so, return mock response
- const isDevMode = import.meta.env.MODE === 'development' || import.meta.env.VITE_DEV_MODE === 'true';
+  // Check the actual DevModeManager state (respects the toggle setting)
+  const isDevModeActive = window.localStorage.getItem('force_dev_mode') === 'true';
 
-  if (isDevMode) {
-    console.log('[DEV MODE] Mock login for development mode');
+  if (isDevModeActive) {
+    console.log('[DEV MODE] Mock login active (toggle is in Development mode)');
     console.log('[DEV MODE] Username:', request.username_or_email);
 
     // Mock successful login response - use proper JWT-like format

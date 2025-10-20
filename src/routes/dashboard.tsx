@@ -38,10 +38,10 @@ function Dashboard() {
 
   const fetchDashboardData = async (pageNum: number = 1, append: boolean = false) => {
     try {
-      // Check if we're in development mode - if so, return mock data
-      const isDevMode = import.meta.env.MODE === 'development' || import.meta.env.VITE_DEV_MODE === 'true';
+      // Check if we're in development mode (using the same logic as DevModeToggle)
+      const isDevModeActive = window.localStorage.getItem('force_dev_mode') === 'true';
 
-      if (isDevMode) {
+      if (isDevModeActive) {
         console.log('[DEV MODE] Using mock dashboard data');
 
         // Mock pizza data for development
