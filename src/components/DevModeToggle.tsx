@@ -8,8 +8,29 @@ interface DevModeToggleProps {
 }
 
 export function DevModeToggle({ className }: DevModeToggleProps) {
-  const [modeInfo, setModeInfo] = React.useState(devModeManager.getModeInfo());
-  const [isDevMode, setIsDevMode] = React.useState(devModeManager.isDevModeActive());
+  // Clear any existing dev mode on component mount to ensure Secure mode is default
+  React.useEffect(() => {
+    if (window.localStorage.getItem('force_dev_mode') === 'true') {
+      window.localStorage.removeItem('force_dev_mode');
+      console.log('[DEVMODE] Cleared existing dev mode - defaulting to Secure mode');
+      // Update state to reflect the change
+      setModeInfo({ mode: 'production', reason: 'default secure mode', canOverride: true });
+      setIsDevMode(false);
+    }
+  }, []);
+
+  const [modeInfo, setModeInfo] = React.useState(() => {
+    // Ensure we start with Secure mode
+    if (window.localStorage.getItem('force_dev_mode') === 'true') {
+      return { mode: 'development', reason: 'forced via localStorage', canOverride: true };
+    }
+    return { mode: 'production', reason: 'default secure mode', canOverride: true };
+  });
+
+  const [isDevMode, setIsDevMode] = React.useState(() => {
+    // Ensure we start with Secure mode (not Development mode)
+    return window.localStorage.getItem('force_dev_mode') === 'true';
+  });
 
   const handleToggle = () => {
     const newState = !isDevMode; // Simply alternate the current state
