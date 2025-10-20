@@ -31,8 +31,8 @@ export interface AuthResponse {
 }
 
 export async function login(request: LoginRequest): Promise<AuthResponse> {
-  // Check if we're in development mode - if so, return mock response
-  const isDevMode = import.meta.env.MODE === 'development' && !import.meta.env.VITE_DEV_MODE;
+ // Check if we're in development mode - if so, return mock response
+ const isDevMode = import.meta.env.MODE === 'development' || import.meta.env.VITE_DEV_MODE === 'true';
 
   if (isDevMode) {
     console.log('[DEV MODE] Mock login for development mode');
