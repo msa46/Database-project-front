@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { isAuthenticated, getToken, isTokenExpired, logout } from '../lib/auth'
+import { isAuthenticated, getValidToken, logout } from '../lib/auth'
 import { API_URL } from '../lib/api'
 import ky from 'ky'
 import {
@@ -14,10 +14,11 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { OrderProvider } from '@/components/order/OrderProvider'
+import { OrderProvider, useOrder } from '@/components/order/OrderProvider'
 import { QuantitySelector } from '@/components/order/QuantitySelector'
 import { OrderButton } from '@/components/order/OrderButton'
 import { OrderSummary } from '@/components/order/OrderSummary'
+import { BulkOrderModal } from '@/components/order/BulkOrderModal'
 
 export const Route = createFileRoute('/dashboard')({
   component: Dashboard,
@@ -33,18 +34,18 @@ function Dashboard() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [allPizzas, setAllPizzas] = useState<any[]>([])
   const [quantities, setQuantities] = useState<Record<string | number, number>>({})
+  const [showBulkOrderModal, setShowBulkOrderModal] = useState(false)
 
   const fetchDashboardData = async (pageNum: number = 1, append: boolean = false) => {
     try {
-      const token = getToken();
+      const token = getValidToken();
       
-      console.log('[DEBUG] fetchDashboardData called');
-      console.log('[DEBUG] Token exists:', !!token);
-      console.log('[DEBUG] Token expired?', isTokenExpired());
+      console.log('[DIAGNOSTIC] fetchDashboardData called');
+      console.log('[DIAGNOSTIC] Valid token exists:', !!token);
       
       // Check if token is valid before making request
-      if (!token || isTokenExpired()) {
-        console.log('[DEBUG] Token is missing or expired, redirecting to login');
+      if (!token) {
+        console.log('[DIAGNOSTIC] No valid token found, redirecting to login');
         navigate({ to: '/login' });
         return;
       }
@@ -172,31 +173,16 @@ function Dashboard() {
     document.title = 'Dashboard'
     
     // Check authentication status
-    const token = getToken()
-    console.log('[DEBUG] Authentication check - token exists:', !!token);
+    const token = getValidToken()
+    console.log('[DIAGNOSTIC] Authentication check - valid token exists:', !!token);
     
     if (!token) {
-      console.log('[DEBUG] No token found, checking if page refresh might help with cookies')
-      // Try to check if we have a valid session through cookies even without localStorage token
-      // This handles cases where the user logged in but the token wasn't stored properly
-      fetchDashboardData(1, false).catch(err => {
-        console.log('[DEBUG] No token and API request failed, redirecting to login');
-        navigate({ to: '/login' });
-      });
-      return
-    }
-    
-    const expired = isTokenExpired();
-    console.log('[DEBUG] Token expired check:', expired);
-    
-    if (expired) {
-      console.log('[DEBUG] Token is expired, clearing and redirecting to login')
-      logout();
+      console.log('[DIAGNOSTIC] No valid token found, redirecting to login')
       navigate({ to: '/login' })
       return
     }
 
-    console.log('[DEBUG] Authentication passed, fetching dashboard data');
+    console.log('[DIAGNOSTIC] Authentication passed, fetching dashboard data');
     fetchDashboardData(1, false)
   }, [navigate])
 
@@ -209,28 +195,6 @@ function Dashboard() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="container mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
-        <div className="bg-white shadow rounded-lg p-6">
-          <p>Loading dashboard data...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="container mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
-        <div className="bg-white shadow rounded-lg p-6">
-          <p className="text-red-500">Error: {error}</p>
-        </div>
-      </div>
-    )
-  }
-
   const handleQuantityChange = (pizzaId: string | number, newQuantity: number) => {
     setQuantities(prev => ({
       ...prev,
@@ -238,8 +202,42 @@ function Dashboard() {
     }))
   }
 
-  return (
-    <OrderProvider>
+  const handleBulkOrder = () => {
+    // Reset all quantities to 1 for bulk ordering
+    const resetQuantities: Record<string | number, number> = {}
+    allPizzas.forEach((pizza, index) => {
+      const pizzaId = pizza.id || index
+      resetQuantities[pizzaId] = 1
+    })
+    setQuantities(resetQuantities)
+    setShowBulkOrderModal(true)
+  }
+
+  // Create a wrapper component to use the OrderProvider context
+  const DashboardContent = () => {
+    if (loading) {
+      return (
+        <div className="container mx-auto p-4">
+          <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
+          <div className="bg-white shadow rounded-lg p-6">
+            <p>Loading dashboard data...</p>
+          </div>
+        </div>
+      )
+    }
+
+    if (error) {
+      return (
+        <div className="container mx-auto p-4">
+          <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
+          <div className="bg-white shadow rounded-lg p-6">
+            <p className="text-red-500">Error: {error}</p>
+          </div>
+        </div>
+      )
+    }
+
+    return (
       <div className="container mx-auto p-4">
         <h1 className="text-2xl font-bold mb-4">Welcome to Your Dashboard</h1>
         
@@ -247,27 +245,27 @@ function Dashboard() {
           {/* Pizza Table - Left Side (2 columns on large screens) */}
           <div className="lg:col-span-2">
             <div className="bg-white shadow rounded-lg p-6">
-              <p className="mb-4">This is your personal dashboard where you can manage your account and view your activities.</p>
+              <div className="flex justify-between items-center mb-4">
+                <p>This is your personal dashboard where you can manage your account and view your activities.</p>
+                {allPizzas.length > 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={handleBulkOrder}
+                    className="shrink-0"
+                  >
+                    Quick Order Multiple Pizzas
+                  </Button>
+                )}
+              </div>
               
               {dashboardData && (
                 <div className="mb-6">
                   <h2 className="text-xl font-semibold mb-4">Available Pizzas</h2>
                   
-                  {/* Try to extract pizzas from different possible locations in the data */}
-                  <Table>
-                    <TableCaption>List of available pizzas</TableCaption>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead>Size</TableHead>
-                        <TableHead>Toppings</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  {/* Redesigned pizza table for better ordering experience */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Select Pizzas for Your Order</h3>
+                    <div className="grid gap-4">
                       {allPizzas.length > 0 ? (
                         allPizzas.map((pizza: any, index: number) => {
                           const pizzaId = pizza.id || index
@@ -298,25 +296,57 @@ function Dashboard() {
                           });
                           
                           return (
-                            <TableRow key={pizzaId}>
-                              <TableCell className="font-medium">{pizzaId}</TableCell>
-                              <TableCell>{pizza.name || 'N/A'}</TableCell>
-                              <TableCell>{pizza.description || 'N/A'}</TableCell>
-                              <TableCell>${pizza.price || '0.00'}</TableCell>
-                              <TableCell>{pizza.size || 'N/A'}</TableCell>
-                              <TableCell>
-                                {pizza.toppings && Array.isArray(pizza.toppings)
-                                  ? pizza.toppings.join(', ')
-                                  : pizza.toppings || 'N/A'
-                                }
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-col space-y-2">
-                                  <QuantitySelector
-                                    quantity={quantities[pizzaId] || 1}
-                                    onIncrease={() => handleQuantityChange(pizzaId, (quantities[pizzaId] || 1) + 1)}
-                                    onDecrease={() => handleQuantityChange(pizzaId, Math.max(1, (quantities[pizzaId] || 1) - 1))}
-                                  />
+                            <div key={pizzaId} className="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
+                              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                {/* Pizza Details */}
+                                <div className="flex-1">
+                                  <div className="flex items-start gap-3">
+                                    <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                      <span className="text-orange-600 font-bold text-lg">🍕</span>
+                                    </div>
+                                    <div className="flex-1">
+                                      <h4 className="font-semibold text-lg">{pizza.name || 'N/A'}</h4>
+                                      <p className="text-sm text-gray-600 mt-1">{pizza.description || 'No description available'}</p>
+                                      
+                                      <div className="flex flex-wrap gap-4 mt-2 text-sm">
+                                        <div className="flex items-center gap-1">
+                                          <span className="font-medium">Size:</span>
+                                          <span className="bg-gray-100 px-2 py-1 rounded">{pizza.size || 'medium'}</span>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-1">
+                                          <span className="font-medium">Price:</span>
+                                          <span className="text-green-600 font-semibold">${pizza.price || '0.00'}</span>
+                                        </div>
+                                      </div>
+                                      
+                                      {pizza.toppings && Array.isArray(pizza.toppings) && pizza.toppings.length > 0 && (
+                                        <div className="mt-2">
+                                          <span className="font-medium text-sm">Toppings: </span>
+                                          <div className="flex flex-wrap gap-1 mt-1">
+                                            {pizza.toppings.map((topping: string, toppingIndex: number) => (
+                                              <span key={toppingIndex} className="bg-orange-50 text-orange-700 px-2 py-1 rounded-full text-xs">
+                                                {topping}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* Order Controls */}
+                                <div className="flex flex-col items-end gap-3 min-w-[200px]">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium">Qty:</span>
+                                    <QuantitySelector
+                                      quantity={quantities[pizzaId] || 1}
+                                      onIncrease={() => handleQuantityChange(pizzaId, (quantities[pizzaId] || 1) + 1)}
+                                      onDecrease={() => handleQuantityChange(pizzaId, Math.max(1, (quantities[pizzaId] || 1) - 1))}
+                                    />
+                                  </div>
+                                  
                                   {isValidPrice ? (
                                     <OrderButton
                                       pizza={{
@@ -324,30 +354,29 @@ function Dashboard() {
                                         name: pizza.name || 'N/A',
                                         description: pizza.description || 'N/A',
                                         price: parsedPrice,
-                                        size: pizza.size || 'N/A',
+                                        size: pizza.size || 'medium', // Default to 'medium' instead of 'N/A'
                                         toppings: Array.isArray(pizza.toppings) ? pizza.toppings : []
                                       }}
                                       quantity={quantities[pizzaId] || 1}
                                     />
                                   ) : (
-                                    <div className="text-sm text-red-500">
+                                    <div className="text-sm text-red-500 bg-red-50 p-2 rounded">
                                       Invalid price - cannot order
                                     </div>
                                   )}
                                 </div>
-                              </TableCell>
-                            </TableRow>
+                              </div>
+                            </div>
                           )
                         })
                       ) : (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center py-4">
-                            No pizzas found. Check back later for delicious pizzas!
-                          </TableCell>
-                        </TableRow>
+                        <div className="text-center py-8 bg-gray-50 rounded-lg">
+                          <div className="text-4xl mb-2">🍕</div>
+                          <p className="text-gray-500">No pizzas found. Check back later for delicious pizzas!</p>
+                        </div>
                       )}
-                    </TableBody>
-                  </Table>
+                    </div>
+                  </div>
                   
                   {hasMore && (
                     <div className="flex justify-center mt-4">
@@ -387,7 +416,20 @@ function Dashboard() {
             <p>Manage your account settings and preferences.</p>
           </div>
         </div>
+        
+        <BulkOrderModal
+          isOpen={showBulkOrderModal}
+          onClose={() => setShowBulkOrderModal(false)}
+          pizzas={allPizzas}
+          initialQuantities={quantities}
+        />
       </div>
+    )
+  }
+
+  return (
+    <OrderProvider>
+      <DashboardContent />
     </OrderProvider>
   )
 }

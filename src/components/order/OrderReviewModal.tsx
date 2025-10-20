@@ -11,10 +11,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useOrder } from './OrderProvider'
 import type { PizzaItem } from './OrderProvider'
-import type { OrderData } from '@/lib/types'
+import type { OrderData, BackendOrderRequest, MultiplePizzaOrderRequest } from '@/lib/types'
 import { submitOrder } from '@/lib/api'
 import { useNavigate } from '@tanstack/react-router'
-import { getToken, isTokenExpired } from '@/lib/auth'
+import { getValidToken } from '@/lib/auth'
 
 interface OrderReviewModalProps {
   isOpen: boolean
@@ -28,21 +28,15 @@ export const OrderReviewModal: React.FC<OrderReviewModalProps> = ({ isOpen, onCl
   const [error, setError] = useState<string | null>(null)
 
   const handlePlaceOrder = async () => {
-    console.log('[DEBUG] Order submission started')
+    console.log('[DIAGNOSTIC] Order submission started')
     
     // Check authentication before proceeding
-    const token = getToken()
+    const token = getValidToken()
     if (!token) {
-      console.log('[DEBUG] No token found, cannot place order')
+      console.log('[DIAGNOSTIC] No valid token found, cannot place order')
       setError('You must be logged in to place an order.')
-      return
-    }
-    
-    if (isTokenExpired()) {
-      console.log('[DEBUG] Token is expired, cannot place order')
-      setError('Your session has expired. Please log in again.')
       setTimeout(() => {
-        if (confirm('Your session has expired. Would you like to log in again?')) {
+        if (confirm('You need to log in to place an order. Would you like to log in now?')) {
           navigate({ to: '/login' })
         }
       }, 1000)
@@ -54,103 +48,153 @@ export const OrderReviewModal: React.FC<OrderReviewModalProps> = ({ isOpen, onCl
 
     try {
       // Prepare order data with proper type conversion
-      const orderData: OrderData = {
-        items: cart.items.map((item: PizzaItem) => {
-          // Convert ID to number, but handle cases where it might be a non-numeric string
-          let convertedId: number;
-          if (typeof item.id === 'string') {
-            // Try to convert string ID to number, if it fails, use a hash or fallback
-            const parsedId = parseInt(item.id, 10);
-            convertedId = isNaN(parsedId) ? item.id.charCodeAt(0) : parsedId;
-            console.log('[DEBUG] Converting string ID to number:', {
-              originalId: item.id,
-              convertedId,
-              isNumeric: !isNaN(parsedId)
-            });
-          } else {
-            convertedId = Number(item.id);
-          }
-          
-          const processedItem = {
-            id: convertedId, // Ensure ID is always a number for the API
-            name: String(item.name), // Ensure name is a string
-            price: Number(item.price), // Ensure price is a number
-            size: String(item.size), // Ensure size is a string
-            toppings: Array.isArray(item.toppings) ? item.toppings : [], // Ensure toppings is an array
-            quantity: Number(item.quantity), // Ensure quantity is a number
-          };
-          
-          // Log detailed information about each item being processed
-          console.log('[DEBUG] Processing cart item:', {
+      console.log('[DIAGNOSTIC] Starting order data preparation with cart items:', cart.items);
+      
+      // Process cart items to match backend expectations
+      const processedPizzas = cart.items.map((item: PizzaItem, index: number) => {
+        // Convert ID to number, but handle cases where it might be a non-numeric string
+        let convertedId: number;
+        if (typeof item.id === 'string') {
+          // Try to convert string ID to number, if it fails, use a hash or fallback
+          const parsedId = parseInt(item.id, 10);
+          convertedId = isNaN(parsedId) ? item.id.charCodeAt(0) : parsedId;
+          console.log('[DIAGNOSTIC] Converting string ID to number:', {
+            itemIndex: index,
             originalId: item.id,
             originalIdType: typeof item.id,
-            convertedId: processedItem.id,
-            convertedIdType: typeof processedItem.id,
-            name: processedItem.name,
-            nameType: typeof processedItem.name,
-            nameLength: processedItem.name.length,
-            price: processedItem.price,
-            priceType: typeof processedItem.price,
-            priceIsValid: !isNaN(processedItem.price) && processedItem.price > 0,
-            size: processedItem.size,
-            sizeType: typeof processedItem.size,
-            sizeLength: processedItem.size.length,
-            toppings: processedItem.toppings,
-            toppingsType: typeof processedItem.toppings,
-            toppingsIsArray: Array.isArray(processedItem.toppings),
-            toppingsLength: processedItem.toppings.length,
-            quantity: processedItem.quantity,
-            quantityType: typeof processedItem.quantity,
-            quantityIsValid: !isNaN(processedItem.quantity) && processedItem.quantity > 0
+            convertedId,
+            isNumeric: !isNaN(parsedId),
+            charCodeFallback: isNaN(parsedId) ? item.id.charCodeAt(0) : 'N/A'
           });
-          
-          return processedItem;
-        }),
+        } else {
+          convertedId = Number(item.id);
+          console.log('[DIAGNOSTIC] ID is already a number:', {
+            itemIndex: index,
+            originalId: item.id,
+            originalIdType: typeof item.id,
+            convertedId
+          });
+        }
+        
+        const processedPizza = {
+          id: convertedId, // Ensure ID is always a number for the API
+          name: String(item.name), // Ensure name is a string
+          price: Number(item.price), // Ensure price is a number
+          size: String(item.size), // Ensure size is a string
+          toppings: Array.isArray(item.toppings) ? item.toppings : [], // Ensure toppings is an array
+          quantity: Number(item.quantity), // Ensure quantity is a number
+        };
+        
+        // Add additional validation for the converted ID
+        console.log('[DIAGNOSTIC] Final pizza data for API:', {
+          itemIndex: index,
+          finalId: processedPizza.id,
+          finalIdType: typeof processedPizza.id,
+          finalIdIsNaN: isNaN(processedPizza.id),
+          finalIdIsInteger: Number.isInteger(processedPizza.id),
+          finalIdIsPositive: processedPizza.id > 0,
+          name: processedPizza.name,
+          nameLength: processedPizza.name.length,
+          price: processedPizza.price,
+          priceIsNaN: isNaN(processedPizza.price),
+          priceIsPositive: processedPizza.price > 0,
+          size: processedPizza.size,
+          sizeLength: processedPizza.size.length,
+          toppings: processedPizza.toppings,
+          toppingsIsArray: Array.isArray(processedPizza.toppings),
+          quantity: processedPizza.quantity,
+          quantityIsNaN: isNaN(processedPizza.quantity),
+          quantityIsPositive: processedPizza.quantity > 0
+        });
+        
+        // Log detailed information about each pizza being processed
+        console.log('[DEBUG] Processing cart pizza:', {
+          originalId: item.id,
+          originalIdType: typeof item.id,
+          convertedId: processedPizza.id,
+          convertedIdType: typeof processedPizza.id,
+          name: processedPizza.name,
+          nameType: typeof processedPizza.name,
+          nameLength: processedPizza.name.length,
+          price: processedPizza.price,
+          priceType: typeof processedPizza.price,
+          priceIsValid: !isNaN(processedPizza.price) && processedPizza.price > 0,
+          size: processedPizza.size,
+          sizeType: typeof processedPizza.size,
+          sizeLength: processedPizza.size.length,
+          toppings: processedPizza.toppings,
+          toppingsType: typeof processedPizza.toppings,
+          toppingsIsArray: Array.isArray(processedPizza.toppings),
+          toppingsLength: processedPizza.toppings.length,
+          quantity: processedPizza.quantity,
+          quantityType: typeof processedPizza.quantity,
+          quantityIsValid: !isNaN(processedPizza.quantity) && processedPizza.quantity > 0
+        });
+        
+        return processedPizza;
+      });
+      
+      // Create order data with the expected structure for the backend
+      // The backend expects 'pizza_quantities' instead of 'pizzas'
+      const orderData: OrderData = {
+        pizzas: processedPizzas, // Keep for frontend compatibility
         totalAmount: Number(cart.totalAmount), // Ensure totalAmount is a number
         totalItems: Number(cart.totalItems), // Ensure totalItems is a number
       }
-
-      console.log('[DEBUG] Order data prepared:', JSON.stringify(orderData, null, 2))
+      
+      // Create the request body with the expected backend structure
+      // The backend expects MultiplePizzaOrderRequest structure
+      const requestBody = {
+        pizza_quantities: processedPizzas.map(pizza => ({
+          pizza_id: pizza.id,
+          quantity: pizza.quantity
+        })),
+        extra_ids: null, // Not used in current implementation
+        discount_code: null, // Not used in current implementation
+        postal_code: null // Will be taken from user's profile in backend
+      };
+      
+      console.log('[DEBUG] Request body for backend:', JSON.stringify(requestBody, null, 2));
       console.log('[DEBUG] Order data validation:', {
-        itemsCount: orderData.items.length,
+        pizzasCount: orderData.pizzas.length,
         totalAmount: orderData.totalAmount,
         totalItems: orderData.totalItems,
-        sampleItem: orderData.items[0] ? {
-          id: orderData.items[0].id,
-          idType: typeof orderData.items[0].id,
-          price: orderData.items[0].price,
-          priceType: typeof orderData.items[0].price,
-          quantity: orderData.items[0].quantity,
-          quantityType: typeof orderData.items[0].quantity,
+        samplePizza: orderData.pizzas[0] ? {
+          id: orderData.pizzas[0].id,
+          idType: typeof orderData.pizzas[0].id,
+          price: orderData.pizzas[0].price,
+          priceType: typeof orderData.pizzas[0].price,
+          quantity: orderData.pizzas[0].quantity,
+          quantityType: typeof orderData.pizzas[0].quantity,
         } : null
       })
 
       // Additional validation before sending
-      if (orderData.items.length === 0) {
+      if (orderData.pizzas.length === 0) {
         setError('Your cart is empty. Please add items before placing an order.')
         setIsSubmitting(false)
         return
       }
 
-      // Validate each item has the required fields
-      const invalidItems = orderData.items.filter((item, index) => {
-        const idAsNumber = Number(item.id);
+      // Validate each pizza has the required fields
+      const invalidPizzas = orderData.pizzas.filter((pizza, index) => {
+        const idAsNumber = Number(pizza.id);
         
         // Check each validation rule individually and log specific failures
         const validations = {
-          idExists: !!item.id,
+          idExists: !!pizza.id,
           idIsNumber: !isNaN(idAsNumber),
-          nameExists: !!item.name,
-          nameIsString: typeof item.name === 'string',
-          nameNotEmpty: item.name.trim().length > 0,
-          priceExists: !isNaN(item.price),
-          pricePositive: item.price > 0,
-          sizeExists: !!item.size,
-          sizeIsString: typeof item.size === 'string',
-          sizeNotEmpty: item.size.trim().length > 0,
-          toppingsIsArray: Array.isArray(item.toppings),
-          quantityExists: !isNaN(item.quantity),
-          quantityPositive: item.quantity > 0
+          nameExists: !!pizza.name,
+          nameIsString: typeof pizza.name === 'string',
+          nameNotEmpty: pizza.name.trim().length > 0,
+          priceExists: !isNaN(pizza.price),
+          pricePositive: pizza.price > 0,
+          sizeExists: !!pizza.size,
+          sizeIsString: typeof pizza.size === 'string',
+          sizeNotEmpty: pizza.size.trim().length > 0,
+          toppingsIsArray: Array.isArray(pizza.toppings),
+          quantityExists: !isNaN(pizza.quantity),
+          quantityPositive: pizza.quantity > 0
         };
         
         const isInvalid = !(
@@ -170,9 +214,9 @@ export const OrderReviewModal: React.FC<OrderReviewModalProps> = ({ isOpen, onCl
         );
         
         if (isInvalid) {
-          console.error(`[DEBUG] Invalid item at index ${index}:`, {
+          console.error(`[DEBUG] Invalid pizza at index ${index}:`, {
             originalCartItem: cart.items[index],
-            processedItem: item,
+            processedPizza: pizza,
             validationResults: validations,
             validationFailures: Object.entries(validations)
               .filter(([_, isValid]) => !isValid)
@@ -183,33 +227,39 @@ export const OrderReviewModal: React.FC<OrderReviewModalProps> = ({ isOpen, onCl
         return isInvalid;
       });
 
-      if (invalidItems.length > 0) {
-        console.error('[DEBUG] Invalid items found:', invalidItems)
+      if (invalidPizzas.length > 0) {
+        console.error('[DEBUG] Invalid pizzas found:', invalidPizzas)
         console.error('[DEBUG] Original cart items:', cart.items)
         setError('Some items in your cart have invalid data. Please remove them and try again.')
         setIsSubmitting(false)
         return
       }
 
-      // Submit order to the API
-      const response = await submitOrder(orderData)
+      // Submit order to the API with the correct request body structure
+      console.log('[DEBUG] About to submit order with requestBody:', JSON.stringify(requestBody, null, 2))
+      const response = await submitOrder(requestBody as MultiplePizzaOrderRequest)
 
       console.log('[DEBUG] Order submission response:', response)
+      console.log('[DEBUG] Response success value:', response.success)
+      console.log('[DEBUG] Response error value:', response.error)
+      console.log('[DEBUG] Response orderId value:', response.orderId)
       
       if (response.success) {
         console.log('[DEBUG] Order was successful, clearing cart and closing modal')
         clearCart()
         onClose()
         // Show success message
-        alert(`Order placed successfully! Order ID: ${response.orderId}`)
-        console.log('Order placed successfully:', response.orderId)
+        const orderId = response.orderId || 'Unknown'
+        alert(`Order placed successfully! Order ID: ${orderId}`)
+        console.log('Order placed successfully:', orderId)
       } else {
         console.log('[DEBUG] Order failed with error:', response.error)
         
         // Check if it's an authentication error
         if (response.error?.includes('session has expired') ||
             response.error?.includes('Authentication required') ||
-            response.error?.includes('log in again')) {
+            response.error?.includes('log in again') ||
+            response.error?.includes('token')) {
           console.log('[DEBUG] Authentication error detected, redirecting to login')
           setError(response.error)
           
@@ -220,7 +270,14 @@ export const OrderReviewModal: React.FC<OrderReviewModalProps> = ({ isOpen, onCl
             }
           }, 1000)
         } else {
-          setError(response.error || 'Failed to place order')
+          // Provide more detailed error information
+          const errorMessage = response.error || 'Failed to place order'
+          console.error('[DEBUG] Detailed order failure:', {
+            error: errorMessage,
+            requestBody: requestBody,
+            cartItems: cart.items
+          })
+          setError(errorMessage)
         }
       }
     } catch (err) {

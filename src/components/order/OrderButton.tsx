@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useOrder } from './OrderProvider'
 
@@ -19,8 +19,10 @@ export const OrderButton: React.FC<OrderButtonProps> = ({
   quantity
 }) => {
   const { addToCart } = useOrder()
+  const [isAdding, setIsAdding] = useState(false)
+  const [showSuccess, setShowSuccess] = useState(false)
 
-  const handleAddToOrder = () => {
+  const handleAddToOrder = async () => {
     // Validate price before adding to cart
     const isValidPrice = !isNaN(pizza.price) && pizza.price > 0;
     
@@ -48,19 +50,56 @@ export const OrderButton: React.FC<OrderButtonProps> = ({
       return;
     }
     
-    addToCart({
-      ...pizza,
-      quantity
-    })
+    setIsAdding(true)
+    
+    // Simulate a small delay for better UX
+    setTimeout(() => {
+      addToCart({
+        ...pizza,
+        quantity
+      })
+      
+      setIsAdding(false)
+      setShowSuccess(true)
+      
+      // Hide success message after 2 seconds
+      setTimeout(() => {
+        setShowSuccess(false)
+      }, 2000)
+    }, 300)
   }
 
   return (
-    <Button
-      onClick={handleAddToOrder}
-      disabled={quantity <= 0}
-      className="w-full"
-    >
-      Add {quantity > 1 ? `${quantity} ` : ''}to Order
-    </Button>
+    <div className="w-full">
+      <Button
+        onClick={handleAddToOrder}
+        disabled={quantity <= 0 || isAdding}
+        className="w-full relative overflow-hidden"
+      >
+        {isAdding ? (
+          <span className="flex items-center gap-2">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+            Adding...
+          </span>
+        ) : (
+          <>
+            <span className="relative z-10">
+              Add {quantity > 1 ? `${quantity} ` : ''}to Order
+            </span>
+            {quantity > 1 && (
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 bg-green-600 text-white text-xs px-2 py-1 rounded-full">
+                ${(pizza.price * quantity).toFixed(2)}
+              </span>
+            )}
+          </>
+        )}
+      </Button>
+      
+      {showSuccess && (
+        <div className="mt-2 text-sm text-green-600 font-medium animate-pulse">
+          ✓ Added {quantity > 1 ? `${quantity} ${pizza.name}s` : pizza.name} to cart
+        </div>
+      )}
+    </div>
   )
 }

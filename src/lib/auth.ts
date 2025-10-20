@@ -172,24 +172,89 @@ export function logout(): void {
 
 export function isTokenExpired(): boolean {
     const token = getToken();
-    if (!token) return true;
+    if (!token) {
+        console.log('[DIAGNOSTIC] isTokenExpired: No token found, returning true');
+        return true;
+    }
     
     try {
+        console.log('[DIAGNOSTIC] isTokenExpired: Checking token expiration');
+        console.log('[DIAGNOSTIC] Token format check - has 3 parts:', token.split('.').length === 3);
+        
         // Simple JWT token parsing to check expiration
-        const payload = JSON.parse(atob(token.split('.')[1]));
+        const parts = token.split('.');
+        console.log('[DIAGNOSTIC] Token parts:', parts.map((part, i) => `Part ${i}: ${part.substring(0, 20)}...`));
+        
+        const payload = JSON.parse(atob(parts[1]));
+        console.log('[DIAGNOSTIC] Token payload:', payload);
+        
         const currentTime = Date.now() / 1000;
+        console.log('[DIAGNOSTIC] Current time (Unix timestamp):', currentTime);
+        console.log('[DIAGNOSTIC] Token expiration time:', payload.exp);
+        console.log('[DIAGNOSTIC] Token expired?', payload.exp < currentTime);
+        console.log('[DIAGNOSTIC] Time until expiration (seconds):', payload.exp - currentTime);
+        
         return payload.exp < currentTime;
     } catch (error) {
-        console.error('[DEBUG] Error parsing token:', error);
+        console.error('[DIAGNOSTIC] Error parsing token:', error);
+        console.error('[DIAGNOSTIC] Token that failed to parse:', token.substring(0, 50) + '...');
         return true; // If we can't parse the token, assume it's expired
     }
 }
 
 export function refreshTokenIfNeeded(): boolean {
     if (isTokenExpired()) {
-        console.log('[DEBUG] Token is expired, logging out');
+        console.log('[DIAGNOSTIC] Token is expired, logging out');
         logout();
         return false;
     }
     return true;
+}
+
+// New function to validate token format
+export function isValidTokenFormat(token: string): boolean {
+    if (!token || typeof token !== 'string') {
+        console.log('[DIAGNOSTIC] Invalid token: not a string or empty');
+        return false;
+    }
+    
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+        console.log('[DIAGNOSTIC] Invalid token format: does not have 3 parts');
+        return false;
+    }
+    
+    try {
+        // Try to parse the payload
+        JSON.parse(atob(parts[1]));
+        return true;
+    } catch (error) {
+        console.log('[DIAGNOSTIC] Invalid token: payload cannot be parsed');
+        return false;
+    }
+}
+
+// Enhanced getToken function with validation
+export function getValidToken(): string | null {
+    const token = getToken();
+    
+    if (!token) {
+        console.log('[DIAGNOSTIC] getValidToken: No token found');
+        return null;
+    }
+    
+    if (!isValidTokenFormat(token)) {
+        console.log('[DIAGNOSTIC] getValidToken: Invalid token format, removing and returning null');
+        logout();
+        return null;
+    }
+    
+    if (isTokenExpired()) {
+        console.log('[DIAGNOSTIC] getValidToken: Token is expired, removing and returning null');
+        logout();
+        return null;
+    }
+    
+    console.log('[DIAGNOSTIC] getValidToken: Token is valid');
+    return token;
 }

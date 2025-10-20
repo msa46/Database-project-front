@@ -151,18 +151,25 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
     const hasValidSize = item.size && typeof item.size === 'string' && item.size.trim().length > 0;
     const hasValidToppings = Array.isArray(item.toppings);
     
-    console.log('[DEBUG] addToCart called with item:', {
+    console.log('[DIAGNOSTIC] addToCart called with item:', {
       id: item.id,
       idType: typeof item.id,
       name: item.name,
       price: item.price,
       priceType: typeof item.price,
+      priceValue: Number(item.price),
+      priceIsNaN: isNaN(item.price),
+      priceIsGreaterThanZero: item.price > 0,
       isValidPrice: isValidPrice,
       size: item.size,
       toppings: item.toppings,
       toppingsType: typeof item.toppings,
       isArray: Array.isArray(item.toppings),
       quantity: item.quantity,
+      quantityType: typeof item.quantity,
+      quantityValue: Number(item.quantity),
+      quantityIsNaN: isNaN(item.quantity),
+      quantityIsGreaterThanZero: item.quantity > 0,
       isValidQuantity: isValidQuantity,
       hasValidName: hasValidName,
       hasValidSize: hasValidSize,
@@ -170,11 +177,15 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
     });
     
     if (!isValidPrice || !isValidQuantity || !hasValidName || !hasValidSize || !hasValidToppings) {
-      console.error('[DEBUG] Attempted to add invalid item to cart:', {
+      console.error('[DIAGNOSTIC] Attempted to add invalid item to cart:', {
         id: item.id,
         name: item.name,
         price: item.price,
+        priceType: typeof item.price,
+        priceValue: Number(item.price),
         quantity: item.quantity,
+        quantityType: typeof item.quantity,
+        quantityValue: Number(item.quantity),
         size: item.size,
         toppings: item.toppings,
         validationFailures: {
@@ -189,6 +200,7 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
       return;
     }
     
+    console.log('[DIAGNOSTIC] Item passed validation, adding to cart');
     dispatch({ type: 'ADD_TO_CART', payload: item })
   }
 
