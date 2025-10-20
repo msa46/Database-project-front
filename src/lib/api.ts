@@ -8,6 +8,13 @@ export const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost
 console.log('[DEBUG] API_URL initialized to:', API_URL);
 console.log('[DEBUG] Environment VITE_API_URL:', import.meta.env.VITE_API_URL);
 
+// Development mode flag - set to true to use unsecured endpoints
+const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true' || import.meta.env.MODE === 'development';
+
+// Hardcoded user credentials for development mode
+const DEV_USER_ID = 1; // Fixed user ID for development
+const DEV_USERNAME = 'dev_user'; // Fixed username for development
+
 export async function submitOrder(orderData: OrderData | BackendOrderRequest | MultiplePizzaOrderRequest): Promise<OrderResponse> {
   try {
     const token = getValidToken()
@@ -327,3 +334,181 @@ export async function submitOrder(orderData: OrderData | BackendOrderRequest | M
     }
   }
 }
+
+// Unsecured version for development - bypasses authentication with fixed user
+export async function submitOrderUnsecured(orderData: OrderData | BackendOrderRequest | MultiplePizzaOrderRequest): Promise<OrderResponse> {
+  try {
+    console.log('[DEV MODE] Using unsecured endpoint with fixed user:', DEV_USERNAME);
+
+    // Enhanced validation of order data (same as secure version)
+    console.log('[DEV MODE] Order data being sent:', JSON.stringify(orderData, null, 2));
+
+    // Convert order data to the format expected by the unsecured endpoint
+    let unsecuredOrderData: any = {};
+
+    if ('pizza_quantities' in orderData) {
+      // Handle MultiplePizzaOrderRequest or BackendOrderRequest format
+      unsecuredOrderData = {
+        ...orderData,
+        user_id: DEV_USER_ID, // Add fixed user ID
+        username: DEV_USERNAME // Add fixed username
+      };
+    } else {
+      // Handle legacy OrderData format
+      unsecuredOrderData = {
+        pizzas: orderData.pizzas,
+        totalAmount: orderData.totalAmount,
+        totalItems: orderData.totalItems,
+        user_id: DEV_USER_ID,
+        username: DEV_USERNAME
+      };
+    }
+
+    console.log('[DEV MODE] Full unsecured order submission URL:', `${API_URL}/v1/order-unsecured`);
+    console.log('[DEV MODE] Using unsecured endpoint without authentication');
+
+    // Make request without authentication headers
+    const response = await ky.post(`${API_URL}/v1/order-unsecured`, {
+      json: unsecuredOrderData,
+      headers: {
+        'Content-Type': 'application/json'
+        // No Authorization header - this is the "unsecured" part
+      },
+      credentials: 'include',
+      timeout: 30000,
+    });
+
+    console.log('[DEV MODE] Unsecured order response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[DEV MODE] Unsecured order submission error:', errorText);
+
+      try {
+        const errorJson = JSON.parse(errorText);
+        return {
+          success: false,
+          error: `Unsecured order failed: ${errorJson.detail || JSON.stringify(errorJson)}`
+        };
+      } catch {
+        return {
+          success: false,
+          error: `Unsecured order failed: ${response.statusText} - ${errorText}`
+        };
+      }
+    }
+
+    const data = await response.json() as any;
+    console.log('[DEV MODE] Unsecured order submission successful:', data);
+
+    // Validate the response structure
+    const orderResponse: OrderResponse = {
+      success: data.success !== undefined ? data.success : true,
+      orderId: data.orderId || data.order_id || data.id,
+      message: data.message,
+      error: data.error
+    };
+
+    // Check if the response indicates failure despite a 200 status
+    if (orderResponse.success === false || orderResponse.error) {
+      console.error('[DEV MODE] Server returned 200 but indicated failure:', orderResponse.error);
+      return {
+        success: false,
+        error: orderResponse.error || 'Unsecured order failed without specific error message'
+      };
+    }
+
+    return orderResponse;
+  } catch (error) {
+    console.error('[DEV MODE] Unsecured order submission error:', error);
+
+    // Handle network errors
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      return {
+        success: false,
+        error: 'Network error: Unable to connect to the server. Please check your connection.'
+      };
+    }
+
+    return {
+      success: false,
+      error: 'An unexpected error occurred with unsecured order. Please try again.'
+    };
+  }
+}
+
+// Main function that chooses between secure and unsecured based on DEV_MODE
+export async function submitOrderFlexible(orderData: OrderData | BackendOrderRequest | MultiplePizzaOrderRequest): Promise<OrderResponse> {
+  if (DEV_MODE) {
+    console.log('[DEBUG] DEV_MODE is enabled, using unsecured endpoint');
+    return submitOrderUnsecured(orderData);
+  } else {
+    console.log('[DEBUG] DEV_MODE is disabled, using secure endpoint');
+    return submitOrder(orderData);
+  }
+}
+
+// Development utilities for managing the unsecured mode
+export class DevModeManager {
+  private static FORCE_DEV_MODE_KEY = 'force_dev_mode';
+  private static instance: DevModeManager;
+
+  private constructor() {}
+
+  static getInstance(): DevModeManager {
+    if (!DevModeManager.instance) {
+      DevModeManager.instance = new DevModeManager();
+    }
+    return DevModeManager.instance;
+  }
+
+  // Force enable/disable dev mode (overrides environment variable)
+  setDevMode(enabled: boolean): void {
+    if (enabled) {
+      localStorage.setItem(DevModeManager.FORCE_DEV_MODE_KEY, 'true');
+      console.log('[DEV MODE] Forced dev mode enabled');
+    } else {
+      localStorage.removeItem(DevModeManager.FORCE_DEV_MODE_KEY);
+      console.log('[DEV MODE] Forced dev mode disabled');
+    }
+  }
+
+  // Check if dev mode is active (either by environment or forced)
+  isDevModeActive(): boolean {
+    const forced = localStorage.getItem(DevModeManager.FORCE_DEV_MODE_KEY) === 'true';
+    const env = DEV_MODE;
+    const active = forced || env;
+    console.log('[DEV MODE] Status check:', { forced, env, active });
+    return active;
+  }
+
+  // Get current mode info
+  getModeInfo(): { mode: string; reason: string; canOverride: boolean } {
+    const forced = localStorage.getItem(DevModeManager.FORCE_DEV_MODE_KEY) === 'true';
+    const env = DEV_MODE;
+
+    if (forced) {
+      return { mode: 'development', reason: 'forced via localStorage', canOverride: true };
+    } else if (env) {
+      return { mode: 'development', reason: 'environment variable', canOverride: false };
+    } else {
+      return { mode: 'production', reason: 'default secure mode', canOverride: true };
+    }
+  }
+
+  // Toggle dev mode (only works if can override)
+  toggleDevMode(): boolean {
+    const info = this.getModeInfo();
+    if (!info.canOverride) {
+      console.warn('[DEV MODE] Cannot toggle - mode is controlled by environment');
+      return false;
+    }
+
+    const newState = !this.isDevModeActive();
+    this.setDevMode(newState);
+    return newState;
+  }
+}
+
+// Export singleton instance
+export const devModeManager = DevModeManager.getInstance();
