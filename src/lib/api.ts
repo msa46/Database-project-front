@@ -1,6 +1,5 @@
 import ky from 'ky'
-import { getValidToken } from './auth'
-import type { OrderData, BackendOrderRequest, MultiplePizzaOrderRequest, OrderResponse } from './types'
+import type { OrderData, BackendOrderRequest, MultiplePizzaOrderRequest, OrderResponse, CreateDiscountCodeRequest, CreateDiscountCodeResponse, ValidateDiscountCodeRequest, ValidateDiscountCodeResponse } from './types'
 
 export const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -320,4 +319,154 @@ export async function submitOrder(orderData: OrderData | BackendOrderRequest | M
       error: 'An unexpected error occurred. Please try again.'
     }
   }
+}
+
+// Discount code API functions
+export async function createDiscountCode(userId: string): Promise<CreateDiscountCodeResponse> {
+  try {
+    console.log('[DEBUG] Creating discount code for user:', userId);
+    
+    const request: CreateDiscountCodeRequest = {
+      user_id: userId
+    };
+    
+    const response = await ky.post(`${API_URL}/v1/public/discounts/create`, {
+      json: request,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      timeout: 10000,
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[DEBUG] Failed to create discount code:', errorText);
+      
+      try {
+        const errorJson = JSON.parse(errorText);
+        return {
+          success: false,
+          error: errorJson.detail || errorJson.message || `Failed to create discount code: ${response.statusText}`
+        };
+      } catch {
+        return {
+          success: false,
+          error: `Failed to create discount code: ${response.statusText} - ${errorText}`
+        };
+      }
+    }
+    
+    const data = await response.json() as any;
+    console.log('[DEBUG] Discount code created successfully:', data);
+    
+    // Transform the backend response to match our expected format
+    const transformedDiscountCode = {
+      id: data.code,
+      code: data.code,
+      user_id: userId,
+      created_at: new Date().toISOString(),
+      expires_at: '', // Backend doesn't return this in creation
+      used: false,
+      discount_percentage: data.percentage || 10 // Default to 10% if not specified
+    };
+    
+    return {
+      success: true,
+      discount_code: transformedDiscountCode
+    };
+  } catch (error) {
+    console.error('[DEBUG] Error creating discount code:', error);
+    
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      return {
+        success: false,
+        error: 'Network error: Unable to connect to the server. Please check your connection.'
+      };
+    }
+    
+    return {
+      success: false,
+      error: 'An unexpected error occurred while creating your discount code.'
+    };
+  }
+}
+
+export async function validateDiscountCode(code: string): Promise<ValidateDiscountCodeResponse> {
+  try {
+    console.log('[DEBUG] Validating discount code:', code);
+    
+    const response = await ky.get(`${API_URL}/v1/public/discounts/${code}`, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      timeout: 10000,
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[DEBUG] Failed to validate discount code:', errorText);
+      
+      try {
+        const errorJson = JSON.parse(errorText);
+        return {
+          success: true,
+          valid: false,
+          error: errorJson.detail || errorJson.message || 'Invalid discount code'
+        };
+      } catch {
+        return {
+          success: true,
+          valid: false,
+          error: 'Invalid discount code'
+        };
+      }
+    }
+    
+    const data = await response.json() as any;
+    console.log('[DEBUG] Discount code validation response:', data);
+    
+    // Transform the backend response to match our expected format
+    const transformedDiscountCode = {
+      id: data.code,
+      code: data.code,
+      user_id: '', // Backend doesn't return user_id in validation
+      created_at: data.valid_from,
+      expires_at: data.valid_until,
+      used: data.used,
+      discount_percentage: data.percentage
+    };
+    
+    return {
+      success: true,
+      valid: !data.used && new Date(data.valid_until) > new Date(),
+      discount_code: transformedDiscountCode
+    };
+  } catch (error) {
+    console.error('[DEBUG] Error validating discount code:', error);
+    
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      return {
+        success: false,
+        valid: false,
+        error: 'Network error: Unable to connect to the server. Please check your connection.'
+      };
+    }
+    
+    return {
+      success: false,
+      valid: false,
+      error: 'An unexpected error occurred while validating the discount code.'
+    };
+  }
+}
+
+// Helper function to generate a discount code based on username
+export function generateDiscountCode(username: string): string {
+  // Generate a random 6-character alphanumeric suffix
+  const suffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+  // Take first 4 letters of username (or less if username is shorter) and add the suffix
+  const prefix = username.substring(0, 4).toUpperCase();
+  return `${prefix}${suffix}`;
 }

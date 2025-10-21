@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { signup, storeUser } from '@/lib/auth';
+import { createDiscountCode } from '@/lib/api';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +12,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { faker } from '@faker-js/faker';
-import * as zod from 'zod';
 
 const schema = z.object({
   username: z.string().min(1, { message: 'Username is required' }),
@@ -93,7 +93,27 @@ export function SignupForm() {
       // No need for cookies since we're using localStorage for user_id
       console.log('DEBUG: SignupForm - User data stored in localStorage');
       
-      setSuccess('Signup successful! Welcome aboard.');
+      // Create discount code for the new user
+      try {
+        console.log('DEBUG: SignupForm - Creating discount code for new user');
+        const discountResponse = await createDiscountCode(response.id.toString());
+        
+        if (discountResponse.success && discountResponse.discount_code) {
+          // Store the discount code in localStorage as JSON (consistent with other parts of the app)
+          localStorage.setItem('discount_code', JSON.stringify(discountResponse.discount_code));
+          console.log('DEBUG: SignupForm - Discount code created and stored:', discountResponse.discount_code.code);
+          setSuccess('Signup successful! Welcome aboard. A discount code has been created for you.');
+        } else {
+          console.error('DEBUG: SignupForm - Failed to create discount code:', discountResponse.error);
+          // Don't fail the signup process, just log the error
+          setSuccess('Signup successful! Welcome aboard.');
+        }
+      } catch (discountError) {
+        console.error('DEBUG: SignupForm - Error creating discount code:', discountError);
+        // Don't fail the signup process, just log the error
+        setSuccess('Signup successful! Welcome aboard.');
+      }
+      
       form.reset();
       
       // Redirect to dashboard after successful signup

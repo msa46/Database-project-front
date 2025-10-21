@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useReducer, useState } from 'react'
+import React, { createContext, useContext, useReducer, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { getDiscountCode, clearDiscountCode } from '@/lib/auth'
+import type { DiscountCode } from '@/lib/types'
 
 // Define the type for a pizza item
 export interface PizzaItem {
@@ -17,6 +19,9 @@ interface CartState {
   items: PizzaItem[]
   totalAmount: number
   totalItems: number
+  discountCode: DiscountCode | null
+  discountAmount: number
+  finalAmount: number
 }
 
 // Define the action types
@@ -25,12 +30,23 @@ type CartAction =
   | { type: 'REMOVE_FROM_CART'; payload: string | number }
   | { type: 'UPDATE_QUANTITY'; payload: { id: string | number; quantity: number } }
   | { type: 'CLEAR_CART' }
+  | { type: 'APPLY_DISCOUNT'; payload: DiscountCode }
+  | { type: 'REMOVE_DISCOUNT' }
 
 // Define the initial state
 const initialState: CartState = {
   items: [],
   totalAmount: 0,
   totalItems: 0,
+  discountCode: null,
+  discountAmount: 0,
+  finalAmount: 0,
+}
+
+// Helper function to calculate discount
+const calculateDiscount = (totalAmount: number, discountCode: DiscountCode | null): number => {
+  if (!discountCode || !discountCode.discount_percentage) return 0
+  return Math.round((totalAmount * discountCode.discount_percentage) / 100 * 100) / 100 // Round to 2 decimal places
 }
 
 // Create the reducer function
@@ -40,33 +56,40 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       const { id, quantity } = action.payload
       const existingItemIndex = state.items.findIndex(item => item.id === id)
       
+      let newTotalAmount = state.totalAmount
+      let newTotalItems = state.totalItems
+      let newItems = [...state.items]
+      
       if (existingItemIndex !== -1) {
         // Update existing item quantity
-        const updatedItems = [...state.items]
-        const existingItem = updatedItems[existingItemIndex]
-        updatedItems[existingItemIndex] = {
+        const existingItem = newItems[existingItemIndex]
+        newItems[existingItemIndex] = {
           ...existingItem,
           quantity: existingItem.quantity + quantity,
         }
-        
-        return {
-          ...state,
-          items: updatedItems,
-          totalItems: state.totalItems + quantity,
-          totalAmount: state.totalAmount + (action.payload.price * quantity),
-        }
+        newTotalItems = state.totalItems + quantity
+        newTotalAmount = state.totalAmount + (action.payload.price * quantity)
       } else {
         // Add new item
         const newItem: PizzaItem = {
           ...action.payload,
         }
-        
-        return {
-          ...state,
-          items: [...state.items, newItem],
-          totalItems: state.totalItems + quantity,
-          totalAmount: state.totalAmount + (action.payload.price * quantity),
-        }
+        newItems = [...state.items, newItem]
+        newTotalItems = state.totalItems + quantity
+        newTotalAmount = state.totalAmount + (action.payload.price * quantity)
+      }
+      
+      // Calculate discount and final amount
+      const discountAmount = calculateDiscount(newTotalAmount, state.discountCode)
+      const finalAmount = newTotalAmount - discountAmount
+      
+      return {
+        ...state,
+        items: newItems,
+        totalItems: newTotalItems,
+        totalAmount: newTotalAmount,
+        discountAmount,
+        finalAmount,
       }
     }
     
@@ -77,12 +100,20 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       if (!existingItem) return state
       
       const updatedItems = state.items.filter(item => item.id !== itemId)
+      const newTotalAmount = state.totalAmount - (existingItem.price * existingItem.quantity)
+      const newTotalItems = state.totalItems - existingItem.quantity
+      
+      // Calculate discount and final amount
+      const discountAmount = calculateDiscount(newTotalAmount, state.discountCode)
+      const finalAmount = newTotalAmount - discountAmount
       
       return {
         ...state,
         items: updatedItems,
-        totalItems: state.totalItems - existingItem.quantity,
-        totalAmount: state.totalAmount - (existingItem.price * existingItem.quantity),
+        totalItems: newTotalItems,
+        totalAmount: newTotalAmount,
+        discountAmount,
+        finalAmount,
       }
     }
     
@@ -105,16 +136,49 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         quantity,
       }
       
+      const newTotalAmount = state.totalAmount + (existingItem.price * quantityDifference)
+      const newTotalItems = state.totalItems + quantityDifference
+      
+      // Calculate discount and final amount
+      const discountAmount = calculateDiscount(newTotalAmount, state.discountCode)
+      const finalAmount = newTotalAmount - discountAmount
+      
       return {
         ...state,
         items: updatedItems,
-        totalItems: state.totalItems + quantityDifference,
-        totalAmount: state.totalAmount + (existingItem.price * quantityDifference),
+        totalItems: newTotalItems,
+        totalAmount: newTotalAmount,
+        discountAmount,
+        finalAmount,
       }
     }
     
     case 'CLEAR_CART':
-      return initialState
+      return {
+        ...initialState,
+        discountCode: state.discountCode, // Keep discount code when clearing cart
+      }
+    
+    case 'APPLY_DISCOUNT': {
+      const discountAmount = calculateDiscount(state.totalAmount, action.payload)
+      const finalAmount = state.totalAmount - discountAmount
+      
+      return {
+        ...state,
+        discountCode: action.payload,
+        discountAmount,
+        finalAmount,
+      }
+    }
+    
+    case 'REMOVE_DISCOUNT': {
+      return {
+        ...state,
+        discountCode: null,
+        discountAmount: 0,
+        finalAmount: state.totalAmount,
+      }
+    }
     
     default:
       return state
@@ -128,6 +192,8 @@ interface CartContextType {
   removeFromCart: (id: string | number) => void
   updateQuantity: (id: string | number, quantity: number) => void
   clearCart: () => void
+  applyDiscount: (discountCode: DiscountCode) => void
+  removeDiscount: () => void
   isOrderProcessing: boolean
   setIsOrderProcessing: (processing: boolean) => void
 }
@@ -142,6 +208,22 @@ interface OrderProviderProps {
 export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
   const [cart, dispatch] = useReducer(cartReducer, initialState)
   const [isOrderProcessing, setIsOrderProcessing] = useState(false)
+  
+  // Load discount code from localStorage on mount
+  useEffect(() => {
+    const loadDiscountCode = () => {
+      try {
+        const discountCode = getDiscountCode()
+        if (discountCode) {
+          dispatch({ type: 'APPLY_DISCOUNT', payload: discountCode })
+        }
+      } catch (error) {
+        console.error('Error loading discount code:', error)
+      }
+    }
+    
+    loadDiscountCode()
+  }, [])
 
   const addToCart = (item: Omit<PizzaItem, 'quantity'> & { quantity: number }) => {
     // Validate the item before adding to cart
@@ -216,8 +298,17 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
     dispatch({ type: 'CLEAR_CART' })
   }
 
+  const applyDiscount = (discountCode: DiscountCode) => {
+    dispatch({ type: 'APPLY_DISCOUNT', payload: discountCode })
+  }
+
+  const removeDiscount = () => {
+    dispatch({ type: 'REMOVE_DISCOUNT' })
+    clearDiscountCode() // Also remove from localStorage
+  }
+
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, isOrderProcessing, setIsOrderProcessing }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, applyDiscount, removeDiscount, isOrderProcessing, setIsOrderProcessing }}>
       {children}
     </CartContext.Provider>
   )

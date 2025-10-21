@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { login, storeUser } from '@/lib/auth';
+import { createDiscountCode } from '@/lib/api';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,7 +46,35 @@ export function LoginForm() {
       // Store user data in localStorage (no tokens needed!)
       storeUser(response.id, response.username);
 
-      setSuccess('Login successful!');
+      // Check if user already has a discount code
+      const existingDiscountCode = localStorage.getItem('discount_code');
+      
+      if (!existingDiscountCode) {
+        // Create a discount code for the user if they don't have one
+        try {
+          console.log('DEBUG: LoginForm - No existing discount code found, creating one');
+          const discountResponse = await createDiscountCode(response.id.toString());
+          
+          if (discountResponse.success && discountResponse.discount_code) {
+            // Store the discount code in localStorage as JSON (consistent with other parts of the app)
+            localStorage.setItem('discount_code', JSON.stringify(discountResponse.discount_code));
+            console.log('DEBUG: LoginForm - Discount code created and stored:', discountResponse.discount_code.code);
+            setSuccess('Login successful! A discount code has been created for you.');
+          } else {
+            console.error('DEBUG: LoginForm - Failed to create discount code:', discountResponse.error);
+            // Don't fail the login process, just log the error
+            setSuccess('Login successful!');
+          }
+        } catch (discountError) {
+          console.error('DEBUG: LoginForm - Error creating discount code:', discountError);
+          // Don't fail the login process, just log the error
+          setSuccess('Login successful!');
+        }
+      } else {
+        console.log('DEBUG: LoginForm - User already has a discount code:', existingDiscountCode);
+        setSuccess('Login successful!');
+      }
+      
       form.reset();
 
       // Redirect to dashboard after successful login

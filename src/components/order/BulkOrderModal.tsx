@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { QuantitySelector } from './QuantitySelector'
 import { useOrder } from './OrderProvider'
+import { DiscountCodeInput } from './DiscountCodeInput'
 
 interface BulkOrderModalProps {
   isOpen: boolean
@@ -24,7 +25,7 @@ export const BulkOrderModal: React.FC<BulkOrderModalProps> = ({
   pizzas,
   initialQuantities
 }) => {
-  const { addToCart } = useOrder()
+  const { addToCart, cart } = useOrder()
   const [quantities, setQuantities] = useState<Record<string | number, number>>(initialQuantities)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -135,15 +136,39 @@ export const BulkOrderModal: React.FC<BulkOrderModalProps> = ({
             })}
           </div>
           
+          {/* Discount Code Section */}
+          <div className="border-t pt-4">
+            <DiscountCodeInput
+              compact={true}
+              onDiscountApplied={() => {
+                // Force re-render to show updated totals with discount
+              }}
+              onDiscountRemoved={() => {
+                // Force re-render to show updated totals without discount
+              }}
+            />
+          </div>
+          
           <div className="border-t pt-4">
             <div className="flex justify-between items-center mb-2">
-              <span className="font-medium">Total Items:</span>
-              <span>{totalItems}</span>
+              <span className="font-medium">Subtotal:</span>
+              <span>${totalAmount.toFixed(2)}</span>
             </div>
+            {cart.discountAmount > 0 && (
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-medium text-green-600">Discount:</span>
+                <span className="text-green-600">-${cart.discountAmount.toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center">
               <span className="font-semibold text-lg">Total Amount:</span>
-              <span className="font-bold text-lg">${totalAmount.toFixed(2)}</span>
+              <span className="font-bold text-lg">${(totalAmount - cart.discountAmount).toFixed(2)}</span>
             </div>
+            {cart.discountCode && (
+              <div className="text-sm text-green-600 mt-2">
+                {cart.discountCode.code} applied ({cart.discountCode.discount_percentage}% off)
+              </div>
+            )}
           </div>
         </div>
         

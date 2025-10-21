@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -9,12 +9,15 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useOrder } from './OrderProvider'
 import type { PizzaItem } from './OrderProvider'
 import type { OrderData, BackendOrderRequest, MultiplePizzaOrderRequest } from '@/lib/types'
 import { submitOrder } from '@/lib/api'
 import { useNavigate } from '@tanstack/react-router'
 import { getUserId } from '@/lib/auth'
+import { DiscountCodeInput } from './DiscountCodeInput'
 
 interface OrderReviewModalProps {
   isOpen: boolean
@@ -22,11 +25,11 @@ interface OrderReviewModalProps {
 }
 
 export const OrderReviewModal: React.FC<OrderReviewModalProps> = ({ isOpen, onClose }) => {
-  const { cart, clearCart } = useOrder()
+  const { cart, clearCart, removeDiscount } = useOrder()
   const navigate = useNavigate()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
+  
   const handlePlaceOrder = async () => {
     console.log('[DIAGNOSTIC] Order submission started')
     
@@ -150,7 +153,7 @@ export const OrderReviewModal: React.FC<OrderReviewModalProps> = ({ isOpen, onCl
           quantity: pizza.quantity
         })),
         extra_ids: null, // Not used in current implementation
-        discount_code: null, // Not used in current implementation
+        discount_code: cart.discountCode?.code || null, // Include discount code if applied
         postal_code: null // Will be taken from user's profile in backend
       };
       
@@ -335,15 +338,35 @@ export const OrderReviewModal: React.FC<OrderReviewModalProps> = ({ isOpen, onCl
             </CardContent>
           </Card>
           
+          <DiscountCodeInput
+            showTitle={true}
+            onDiscountApplied={() => {
+              // Force re-render to show updated totals
+            }}
+            onDiscountRemoved={() => {
+              // Force re-render to show updated totals
+            }}
+          />
+          
           <Card>
             <CardContent className="pt-6">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-semibold">Subtotal:</span>
+                <span>${cart.totalAmount.toFixed(2)}</span>
+              </div>
+              {cart.discountAmount > 0 && (
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-semibold text-green-600">Discount:</span>
+                  <span className="text-green-600">-${cart.discountAmount.toFixed(2)}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center mb-2">
                 <span className="font-semibold">Total Items:</span>
                 <span>{cart.totalItems} {cart.totalItems === 1 ? 'item' : 'items'}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-lg">Total Amount:</span>
-                <span className="font-bold text-lg">${cart.totalAmount.toFixed(2)}</span>
+                <span className="font-bold text-lg">${cart.finalAmount.toFixed(2)}</span>
               </div>
             </CardContent>
           </Card>

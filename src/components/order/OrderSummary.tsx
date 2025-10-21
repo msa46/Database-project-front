@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useOrder } from './OrderProvider'
 import { OrderReviewModal } from './OrderReviewModal'
+import { DiscountCodeInput } from './DiscountCodeInput'
 import type { PizzaItem } from './OrderProvider'
 
 export const OrderSummary: React.FC = () => {
@@ -107,10 +108,28 @@ export const OrderSummary: React.FC = () => {
           ))}
           
           <div className="pt-4 border-t">
-            <div className="flex justify-between items-center mb-4">
-              <span className="font-semibold">Total:</span>
-              <span className="font-bold text-lg">${cart.totalAmount.toFixed(2)}</span>
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-semibold">Subtotal:</span>
+              <span>${cart.totalAmount.toFixed(2)}</span>
             </div>
+            {cart.discountAmount > 0 && (
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-semibold text-green-600">Discount:</span>
+                <span className="text-green-600">-${cart.discountAmount.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center mb-4">
+              <span className="font-semibold text-lg">Total:</span>
+              <span className="font-bold text-lg">${cart.finalAmount.toFixed(2)}</span>
+            </div>
+            {cart.discountCode && (
+              <div className="text-sm text-green-600 mb-4 p-2 bg-green-50 rounded">
+                <div className="flex items-center justify-between">
+                  <span>✨ {cart.discountCode.code} applied ({cart.discountCode.discount_percentage}% off)</span>
+                  <span className="font-medium">Saved ${cart.discountAmount.toFixed(2)}</span>
+                </div>
+              </div>
+            )}
             <div className="text-sm text-muted-foreground mb-4">
               {cart.totalItems} {cart.totalItems === 1 ? 'item' : 'items'} in cart
             </div>

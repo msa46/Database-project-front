@@ -140,6 +140,7 @@ export async function signup(request: SignupRequest): Promise<AuthResponse> {
 
 const USER_ID_KEY = 'user_id';
 const USERNAME_KEY = 'username';
+const DISCOUNT_CODE_KEY = 'discount_code';
 
 export function storeToken(token: string): void {
     if (!token || typeof token !== 'string' || token.trim() === '') {
@@ -206,4 +207,30 @@ export function isValidTokenFormat(token: string): boolean {
 export function getValidToken(): string | null {
     // No tokens in public auth - return null
     return null;
+}
+
+// Discount code localStorage functions
+export function storeDiscountCode(discountCode: any): void {
+    if (!discountCode || typeof discountCode !== 'object') {
+        console.error('Attempted to store invalid discount code');
+        throw new Error('Cannot store invalid discount code');
+    }
+    localStorage.setItem(DISCOUNT_CODE_KEY, JSON.stringify(discountCode));
+}
+
+export function getDiscountCode(): any | null {
+    try {
+        const discountCodeStr = localStorage.getItem(DISCOUNT_CODE_KEY);
+        if (discountCodeStr) {
+            return JSON.parse(discountCodeStr);
+        }
+        return null;
+    } catch (error) {
+        console.error('Error parsing discount code from localStorage:', error);
+        return null;
+    }
+}
+
+export function clearDiscountCode(): void {
+    localStorage.removeItem(DISCOUNT_CODE_KEY);
 }

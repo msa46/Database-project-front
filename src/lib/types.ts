@@ -39,3 +39,35 @@ export interface OrderResponse {
   message?: string
   error?: string
 }
+
+// Discount code related types
+export interface DiscountCode {
+  id: string;
+  code: string;
+  user_id: string;
+  created_at: string;
+  expires_at?: string;
+  used: boolean;
+  discount_percentage?: number;
+}
+
+export interface CreateDiscountCodeRequest {
+  user_id: string;
+}
+
+export interface CreateDiscountCodeResponse {
+  success: boolean;
+  discount_code?: DiscountCode;
+  error?: string;
+}
+
+export interface ValidateDiscountCodeRequest {
+  code: string;
+}
+
+export interface ValidateDiscountCodeResponse {
+  success: boolean;
+  valid: boolean;
+  discount_code?: DiscountCode;
+  error?: string;
+}
