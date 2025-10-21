@@ -406,24 +406,27 @@ export class DevModeManager {
     }
   }
 
-  // Check if dev mode is active (either by environment or forced)
+  // Check if dev mode is active (only when explicitly forced or VITE_DEV_MODE=true)
+  // Note: We don't consider import.meta.env.MODE === 'development' as dev mode
+  // because that would make dev mode always active during development
   isDevModeActive(): boolean {
     const forced = localStorage.getItem(DevModeManager.FORCE_DEV_MODE_KEY) === 'true';
-    const env = DEV_MODE;
-    const active = forced || env;
-    console.log('[DEV MODE] Status check:', { forced, env, active });
+    // Only consider environment dev mode if it's explicitly set via VITE_DEV_MODE
+    const envDevMode = import.meta.env.VITE_DEV_MODE === 'true';
+    const active = forced || envDevMode;
+    console.log('[DEV MODE] Status check:', { forced, envDevMode, active });
     return active;
   }
 
   // Get current mode info
   getModeInfo(): { mode: string; reason: string; canOverride: boolean } {
     const forced = localStorage.getItem(DevModeManager.FORCE_DEV_MODE_KEY) === 'true';
-    const env = DEV_MODE;
+    const envDevMode = import.meta.env.VITE_DEV_MODE === 'true';
 
     if (forced) {
       return { mode: 'development', reason: 'forced via localStorage', canOverride: true };
-    } else if (env) {
-      return { mode: 'development', reason: 'environment variable', canOverride: false };
+    } else if (envDevMode) {
+      return { mode: 'development', reason: 'VITE_DEV_MODE environment variable', canOverride: false };
     } else {
       return { mode: 'production', reason: 'default secure mode', canOverride: true };
     }

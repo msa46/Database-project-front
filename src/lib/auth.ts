@@ -4,6 +4,7 @@ import ky from 'ky';
 export interface LoginRequest {
     username_or_email: string;
     password: string;
+    userType?: string; // For dev mode dashboard selection
 }
 
 export interface SignupRequest {
@@ -37,14 +38,27 @@ export async function login(request: LoginRequest): Promise<AuthResponse> {
   if (isDevModeActive) {
     console.log('[DEV MODE] Mock login active (toggle is in Development mode)');
     console.log('[DEV MODE] Username:', request.username_or_email);
+    console.log('[DEV MODE] User type:', request.userType || 'customer');
+
+    // Determine user ID and username based on user type
+    let userId: number;
+    let finalUsername: string;
+
+    if (request.userType === 'delivery_driver') {
+      userId = 297; // Different user ID for delivery driver
+      finalUsername = 'delivery_driver_dev';
+    } else {
+      userId = 296; // Customer user ID (from the debug logs we saw)
+      finalUsername = request.username_or_email || 'customer_dev';
+    }
 
     // Mock successful login response - use proper JWT format that matches backend expectations
     const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
     const payload = btoa(JSON.stringify({
-      sub: request.username_or_email,  // Use username as subject to match backend
-      user_id: 1,                     // Include user_id in payload
-      username: request.username_or_email,
-      email: `${request.username_or_email}@example.com`,
+      sub: finalUsername,  // Use username as subject to match backend
+      user_id: userId,     // Include user_id in payload (different for each user type)
+      username: finalUsername,
+      email: `${finalUsername}@example.com`,
       exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days to match backend
       iat: Math.floor(Date.now() / 1000)
     }));
@@ -55,9 +69,9 @@ export async function login(request: LoginRequest): Promise<AuthResponse> {
       access_token: `${header}.${payload}.${signature}`,
       token_type: 'bearer',
       expires_in: 7 * 24 * 60 * 60, // 7 days to match backend
-      user_id: 1,
-      username: request.username_or_email,
-      email: `${request.username_or_email}@example.com`
+      user_id: userId,
+      username: finalUsername,
+      email: `${finalUsername}@example.com`
     };
 
     // Store the mock token

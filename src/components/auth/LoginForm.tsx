@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { login, storeToken } from '@/lib/auth';
+import { devModeManager } from '@/lib/api';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const schema = z.object({
   username_or_email: z.string().min(1, { message: 'Username or email is required' }),
@@ -20,7 +22,45 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isDevMode, setIsDevMode] = useState(false);
+  const [selectedUserType, setSelectedUserType] = useState('customer');
   const navigate = useNavigate();
+
+  // Check if dev mode is active on component mount and listen for changes
+  useEffect(() => {
+    const checkDevMode = () => {
+      const devModeActive = devModeManager.isDevModeActive();
+      setIsDevMode(devModeActive);
+      if (devModeActive) {
+        console.log('[LoginForm] Dev mode is active, showing dashboard selection options');
+      }
+    };
+
+    // Check initially
+    checkDevMode();
+
+    // Listen for localStorage changes (dev mode toggle updates localStorage)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'force_dev_mode') {
+        console.log('[LoginForm] Dev mode localStorage changed, updating state');
+        checkDevMode();
+      }
+    };
+
+    // Listen for custom dev mode toggle events
+    const handleDevModeToggle = () => {
+      console.log('[LoginForm] Dev mode toggle event received, updating state');
+      checkDevMode();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('devModeToggle', handleDevModeToggle);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('devModeToggle', handleDevModeToggle);
+    };
+  }, []);
 
   const form = useForm<FormData>({
     // @ts-ignore: Zod version compatibility issue
@@ -33,9 +73,23 @@ export function LoginForm() {
     setSuccess('');
     try {
       console.log('LoginForm: Submitting login form with data:', data);
-      const response = await login(data);
+      console.log('LoginForm: Selected user type:', selectedUserType);
+
+      // Include the selected user type in the login request for dev mode
+      const loginData = {
+        ...data,
+        userType: isDevMode ? selectedUserType : undefined
+      };
+
+      const response = await login(loginData);
       console.log('LoginForm: Login response received:', response);
       console.log('LoginForm: Token from response:', response.access_token);
+
+      // Store the selected user type for dev mode dashboard detection
+      if (isDevMode) {
+        localStorage.setItem('dev_user_type', selectedUserType);
+        console.log('LoginForm: Stored dev user type:', selectedUserType);
+      }
       
       // Check if token was stored correctly
       const storedToken = localStorage.getItem('auth_token');
@@ -101,6 +155,37 @@ export function LoginForm() {
                 </FormItem>
               )}
             />
+
+            {/* Dev Mode Dashboard Selection */}
+            {isDevMode && (
+              <div className="space-y-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <FormLabel className="text-sm font-medium text-yellow-800">
+                  🚧 Development Mode - Choose Dashboard Type
+                </FormLabel>
+                <RadioGroup
+                  value={selectedUserType}
+                  onValueChange={setSelectedUserType}
+                  className="space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="customer" id="customer" />
+                    <FormLabel htmlFor="customer" className="text-sm text-gray-700 cursor-pointer">
+                      Customer Dashboard - Order pizzas and manage orders
+                    </FormLabel>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="delivery_driver" id="delivery_driver" />
+                    <FormLabel htmlFor="delivery_driver" className="text-sm text-gray-700 cursor-pointer">
+                      Delivery Driver Dashboard - Manage deliveries and routes
+                    </FormLabel>
+                  </div>
+                </RadioGroup>
+                <p className="text-xs text-yellow-600">
+                  This option is only available in development mode for testing different dashboard views.
+                </p>
+              </div>
+            )}
+
             <Button type="submit" disabled={loading} className="w-full">
               {loading ? 'Logging in...' : 'Login'}
             </Button>

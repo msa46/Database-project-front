@@ -38,6 +38,10 @@ export function DevModeToggle({ className }: DevModeToggleProps) {
 
     setIsDevMode(newState);
     setModeInfo(devModeManager.getModeInfo());
+
+    // Dispatch custom event to notify other components of dev mode change
+    window.dispatchEvent(new CustomEvent('devModeToggle'));
+    console.log('[DEVMODE] Dispatched devModeToggle event');
   };
 
   const getModeColor = () => {

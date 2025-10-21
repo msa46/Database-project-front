@@ -35,6 +35,8 @@ function Dashboard() {
   const [allPizzas, setAllPizzas] = useState<any[]>([])
   const [quantities, setQuantities] = useState<Record<string | number, number>>({})
   const [showBulkOrderModal, setShowBulkOrderModal] = useState(false)
+  const [userType, setUserType] = useState<'customer' | 'delivery_driver' | null>(null)
+  const [customers, setCustomers] = useState<any[]>([])
 
   const fetchDashboardData = async (pageNum: number = 1, append: boolean = false) => {
     try {
@@ -44,40 +46,96 @@ function Dashboard() {
       if (isDevModeActive) {
         console.log('[DEV MODE] Using mock dashboard data');
 
-        // Mock pizza data for development
-        const mockPizzas = [
-          {
-            id: 1,
-            name: 'Margherita',
-            description: 'Classic pizza with tomato sauce, mozzarella, and fresh basil',
-            price: '12.99',
-            size: 'medium',
-            toppings: ['tomato sauce', 'mozzarella', 'basil']
-          },
-          {
-            id: 2,
-            name: 'Pepperoni',
-            description: 'Spicy pepperoni with mozzarella cheese and tomato sauce',
-            price: '14.99',
-            size: 'medium',
-            toppings: ['tomato sauce', 'mozzarella', 'pepperoni']
-          },
-          {
-            id: 3,
-            name: 'Vegetarian Supreme',
-            description: 'Loaded with fresh vegetables, mushrooms, and olives',
-            price: '16.99',
-            size: 'medium',
-            toppings: ['tomato sauce', 'mozzarella', 'mushrooms', 'peppers', 'olives', 'onions']
-          }
-        ];
+        // Mock data for development based on user type
+        let mockDashboardData;
+        let devUserType = 'customer';
 
-        const mockDashboardData = {
-          pizzas: mockPizzas,
-          total: mockPizzas.length,
-          page: pageNum,
-          has_more: false
-        };
+        // Check if we should show delivery driver dashboard based on dev mode context
+        const isDevModeActive = window.localStorage.getItem('force_dev_mode') === 'true';
+
+        if (isDevModeActive) {
+          // Try to detect user type from localStorage or default to customer
+          devUserType = localStorage.getItem('dev_user_type') || 'customer';
+
+          if (devUserType === 'delivery_driver') {
+            console.log('[DEV MODE] Using mock delivery driver dashboard data');
+            const mockCustomers = [
+              { id: 1, username: 'john_doe', address: '123 Main St', phone: '555-0123' },
+              { id: 2, username: 'jane_smith', address: '456 Oak Ave', phone: '555-0456' },
+              { id: 3, username: 'bob_johnson', address: '789 Pine Rd', phone: '555-0789' }
+            ];
+
+            mockDashboardData = {
+              customers: mockCustomers,
+              total: mockCustomers.length,
+              page: pageNum,
+              has_more: false
+            };
+
+            setCustomers(mockCustomers);
+            setUserType('delivery_driver');
+          } else {
+            console.log('[DEV MODE] Using mock customer dashboard data');
+            const mockPizzas = [
+              {
+                id: 1,
+                name: 'Margherita',
+                description: 'Classic pizza with tomato sauce, mozzarella, and fresh basil',
+                price: '12.99',
+                size: 'medium',
+                toppings: ['tomato sauce', 'mozzarella', 'basil']
+              },
+              {
+                id: 2,
+                name: 'Pepperoni',
+                description: 'Spicy pepperoni with mozzarella cheese and tomato sauce',
+                price: '14.99',
+                size: 'medium',
+                toppings: ['tomato sauce', 'mozzarella', 'pepperoni']
+              },
+              {
+                id: 3,
+                name: 'Vegetarian Supreme',
+                description: 'Loaded with fresh vegetables, mushrooms, and olives',
+                price: '16.99',
+                size: 'medium',
+                toppings: ['tomato sauce', 'mozzarella', 'mushrooms', 'peppers', 'olives', 'onions']
+              }
+            ];
+
+            mockDashboardData = {
+              pizzas: mockPizzas,
+              total: mockPizzas.length,
+              page: pageNum,
+              has_more: false
+            };
+
+            setAllPizzas(mockPizzas);
+            setUserType('customer');
+          }
+        } else {
+          // Default to customer pizzas for non-dev mode
+          const defaultMockPizzas = [
+            {
+              id: 1,
+              name: 'Margherita',
+              description: 'Classic pizza with tomato sauce, mozzarella, and fresh basil',
+              price: '12.99',
+              size: 'medium',
+              toppings: ['tomato sauce', 'mozzarella', 'basil']
+            }
+          ];
+
+          mockDashboardData = {
+            pizzas: defaultMockPizzas,
+            total: defaultMockPizzas.length,
+            page: pageNum,
+            has_more: false
+          };
+
+          setAllPizzas(defaultMockPizzas);
+          setUserType('customer');
+        }
 
         if (append) {
           setDashboardData((prevData: any) => ({
@@ -88,7 +146,7 @@ function Dashboard() {
           setDashboardData(mockDashboardData);
         }
 
-        setAllPizzas(mockPizzas);
+        // Set appropriate state based on user type - no more variable scope issues
         setHasMore(false);
         setLoading(false);
         setLoadingMore(false);
@@ -145,7 +203,7 @@ function Dashboard() {
 
       const data = await response.json<any>()
       console.log('[DEBUG] Response data:', JSON.stringify(data, null, 2));
-      
+
       if (append) {
         setDashboardData((prevData: any) => ({
           ...prevData,
@@ -154,7 +212,26 @@ function Dashboard() {
       } else {
         setDashboardData(data);
       }
-      
+
+      // Detect user type based on response structure
+      console.log('[DEBUG] Detecting user type from response data');
+      let detectedUserType: 'customer' | 'delivery_driver' | null = 'customer';
+
+      if (data.customers && Array.isArray(data.customers)) {
+        console.log('[DEBUG] Found customers array - this is a delivery driver dashboard');
+        detectedUserType = 'delivery_driver';
+        setCustomers(data.customers);
+      } else if (data.pizzas && Array.isArray(data.pizzas)) {
+        console.log('[DEBUG] Found pizzas array - this is a customer dashboard');
+        detectedUserType = 'customer';
+      } else {
+        console.log('[DEBUG] Could not determine user type, defaulting to customer');
+        detectedUserType = 'customer';
+      }
+
+      setUserType(detectedUserType);
+      console.log('[DEBUG] Detected user type:', detectedUserType);
+
       // Extract pizzas from the response
       console.log('[DEBUG] Extracting pizzas from response data');
       console.log('[DEBUG] Data type:', typeof data);
@@ -298,15 +375,22 @@ function Dashboard() {
 
     return (
       <div className="container mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-4">Welcome to Your Dashboard</h1>
-        
+        <h1 className="text-2xl font-bold mb-4">
+          Welcome to Your {userType === 'delivery_driver' ? 'Delivery Driver' : 'Customer'} Dashboard
+        </h1>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Pizza Table - Left Side (2 columns on large screens) */}
+          {/* Main Content Area */}
           <div className="lg:col-span-2">
             <div className="bg-white shadow rounded-lg p-6">
               <div className="flex justify-between items-center mb-4">
-                <p>This is your personal dashboard where you can manage your account and view your activities.</p>
-                {allPizzas.length > 0 && (
+                <p>
+                  {userType === 'delivery_driver'
+                    ? "Manage your deliveries and customer orders."
+                    : "This is your personal dashboard where you can manage your account and view your activities."
+                  }
+                </p>
+                {userType === 'customer' && allPizzas.length > 0 && (
                   <Button
                     variant="outline"
                     onClick={handleBulkOrder}
@@ -316,6 +400,42 @@ function Dashboard() {
                   </Button>
                 )}
               </div>
+
+              {/* Delivery Driver Dashboard */}
+              {userType === 'delivery_driver' && customers.length > 0 && (
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold mb-4">Customer Management</h2>
+                  <div className="space-y-4">
+                    <Table>
+                      <TableCaption>Customer orders and delivery information</TableCaption>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Customer ID</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Address</TableHead>
+                          <TableHead>Phone</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {customers.map((customer: any) => (
+                          <TableRow key={customer.id}>
+                            <TableCell>{customer.id}</TableCell>
+                            <TableCell>{customer.username || 'N/A'}</TableCell>
+                            <TableCell>{customer.address || 'N/A'}</TableCell>
+                            <TableCell>{customer.phone || 'N/A'}</TableCell>
+                            <TableCell>
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                                Active
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
               
               {dashboardData && (
                 <div className="mb-6">
