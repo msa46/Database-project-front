@@ -38,21 +38,23 @@ export async function login(request: LoginRequest): Promise<AuthResponse> {
     console.log('[DEV MODE] Mock login active (toggle is in Development mode)');
     console.log('[DEV MODE] Username:', request.username_or_email);
 
-    // Mock successful login response - use proper JWT-like format
+    // Mock successful login response - use proper JWT format that matches backend expectations
     const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
     const payload = btoa(JSON.stringify({
-      sub: '1',
+      sub: request.username_or_email,  // Use username as subject to match backend
+      user_id: 1,                     // Include user_id in payload
       username: request.username_or_email,
       email: `${request.username_or_email}@example.com`,
-      exp: Math.floor(Date.now() / 1000) + 3600, // Expires in 1 hour
+      exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days to match backend
       iat: Math.floor(Date.now() / 1000)
     }));
-    const signature = 'mock_signature_for_development';
+    // Create a more realistic signature that won't cause parsing errors
+    const signature = btoa('mock_signature_for_development_mode_only').replace(/=/g, '');
 
     const mockResponse: AuthResponse = {
       access_token: `${header}.${payload}.${signature}`,
-      token_type: 'Bearer',
-      expires_in: 3600,
+      token_type: 'bearer',
+      expires_in: 7 * 24 * 60 * 60, // 7 days to match backend
       user_id: 1,
       username: request.username_or_email,
       email: `${request.username_or_email}@example.com`
