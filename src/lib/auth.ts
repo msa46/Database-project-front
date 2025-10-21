@@ -47,6 +47,9 @@ export async function login(request: LoginRequest): Promise<AuthResponse> {
     if (request.userType === 'delivery_driver') {
       userId = 297; // Different user ID for delivery driver
       finalUsername = 'delivery_driver_dev';
+    } else if (request.userType === 'employee') {
+      userId = 299; // Employee user ID (from the debug logs we saw)
+      finalUsername = 'employee_dev';
     } else {
       userId = 296; // Customer user ID (from the debug logs we saw)
       finalUsername = request.username_or_email || 'customer_dev';

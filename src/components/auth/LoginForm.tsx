@@ -179,6 +179,12 @@ export function LoginForm() {
                       Delivery Driver Dashboard - Manage deliveries and routes
                     </FormLabel>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="employee" id="employee" />
+                    <FormLabel htmlFor="employee" className="text-sm text-gray-700 cursor-pointer">
+                      Employee Dashboard - Manage staff and oversee operations
+                    </FormLabel>
+                  </div>
                 </RadioGroup>
                 <p className="text-xs text-yellow-600">
                   This option is only available in development mode for testing different dashboard views.

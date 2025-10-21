@@ -35,8 +35,9 @@ function Dashboard() {
   const [allPizzas, setAllPizzas] = useState<any[]>([])
   const [quantities, setQuantities] = useState<Record<string | number, number>>({})
   const [showBulkOrderModal, setShowBulkOrderModal] = useState(false)
-  const [userType, setUserType] = useState<'customer' | 'delivery_driver' | null>(null)
+  const [userType, setUserType] = useState<'customer' | 'delivery_driver' | 'employee' | null>(null)
   const [customers, setCustomers] = useState<any[]>([])
+  const [employees, setEmployees] = useState<any[]>([])
 
   const fetchDashboardData = async (pageNum: number = 1, append: boolean = false) => {
     try {
@@ -74,6 +75,23 @@ function Dashboard() {
 
             setCustomers(mockCustomers);
             setUserType('delivery_driver');
+          } else if (devUserType === 'employee') {
+            console.log('[DEV MODE] Using mock employee dashboard data');
+            const mockEmployees = [
+              { id: 1, username: 'manager_smith', position: 'Store Manager', salary: 45000.0, status: 'Available' },
+              { id: 2, username: 'chef_jones', position: 'Head Chef', salary: 38000.0, status: 'Available' },
+              { id: 3, username: 'cashier_brown', position: 'Cashier', salary: 28000.0, status: 'Off_Duty' }
+            ];
+
+            mockDashboardData = {
+              employees: mockEmployees,
+              total: mockEmployees.length,
+              page: pageNum,
+              has_more: false
+            };
+
+            setEmployees(mockEmployees);
+            setUserType('employee');
           } else {
             console.log('[DEV MODE] Using mock customer dashboard data');
             const mockPizzas = [
@@ -147,7 +165,35 @@ function Dashboard() {
         }
 
         // Set appropriate state based on user type - no more variable scope issues
-        setHasMore(false);
+        if (devUserType === 'employee') {
+          // Employee dashboard doesn't need pizza-related state
+          setHasMore(false);
+        } else if (devUserType === 'delivery_driver') {
+          // Delivery driver dashboard doesn't need pizza-related state
+          setHasMore(false);
+        } else {
+          // Set pizzas for customer dashboard - define mockPizzas in the right scope
+          const customerMockPizzas = [
+            {
+              id: 1,
+              name: 'Margherita',
+              description: 'Classic pizza with tomato sauce, mozzarella, and fresh basil',
+              price: '12.99',
+              size: 'medium',
+              toppings: ['tomato sauce', 'mozzarella', 'basil']
+            },
+            {
+              id: 2,
+              name: 'Pepperoni',
+              description: 'Spicy pepperoni with mozzarella cheese and tomato sauce',
+              price: '14.99',
+              size: 'medium',
+              toppings: ['tomato sauce', 'mozzarella', 'pepperoni']
+            }
+          ];
+          setAllPizzas(customerMockPizzas);
+          setHasMore(false);
+        }
         setLoading(false);
         setLoadingMore(false);
 
@@ -215,9 +261,13 @@ function Dashboard() {
 
       // Detect user type based on response structure
       console.log('[DEBUG] Detecting user type from response data');
-      let detectedUserType: 'customer' | 'delivery_driver' | null = 'customer';
+      let detectedUserType: 'customer' | 'delivery_driver' | 'employee' | null = 'customer';
 
-      if (data.customers && Array.isArray(data.customers)) {
+      if (data.employees && Array.isArray(data.employees)) {
+        console.log('[DEBUG] Found employees array - this is an employee dashboard');
+        detectedUserType = 'employee';
+        setEmployees(data.employees);
+      } else if (data.customers && Array.isArray(data.customers)) {
         console.log('[DEBUG] Found customers array - this is a delivery driver dashboard');
         detectedUserType = 'delivery_driver';
         setCustomers(data.customers);
@@ -376,7 +426,10 @@ function Dashboard() {
     return (
       <div className="container mx-auto p-4">
         <h1 className="text-2xl font-bold mb-4">
-          Welcome to Your {userType === 'delivery_driver' ? 'Delivery Driver' : 'Customer'} Dashboard
+          Welcome to Your {
+            userType === 'delivery_driver' ? 'Delivery Driver' :
+            userType === 'employee' ? 'Employee' : 'Customer'
+          } Dashboard
         </h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -387,6 +440,8 @@ function Dashboard() {
                 <p>
                   {userType === 'delivery_driver'
                     ? "Manage your deliveries and customer orders."
+                    : userType === 'employee'
+                    ? "Manage staff and oversee business operations."
                     : "This is your personal dashboard where you can manage your account and view your activities."
                   }
                 </p>
@@ -427,6 +482,42 @@ function Dashboard() {
                             <TableCell>
                               <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
                                 Active
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {/* Employee Dashboard */}
+              {userType === 'employee' && employees.length > 0 && (
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold mb-4">Staff Management</h2>
+                  <div className="space-y-4">
+                    <Table>
+                      <TableCaption>Employee overview and management</TableCaption>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Employee ID</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Position</TableHead>
+                          <TableHead>Salary</TableHead>
+                          <TableHead>Type</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {employees.map((employee: any) => (
+                          <TableRow key={employee.id}>
+                            <TableCell>{employee.id}</TableCell>
+                            <TableCell>{employee.username || 'N/A'}</TableCell>
+                            <TableCell>{employee.position || 'N/A'}</TableCell>
+                            <TableCell>${employee.salary ? employee.salary.toLocaleString() : 'N/A'}</TableCell>
+                            <TableCell>
+                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                                Employee
                               </span>
                             </TableCell>
                           </TableRow>
