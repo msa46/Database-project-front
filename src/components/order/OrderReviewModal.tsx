@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -9,11 +9,9 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { useOrder } from './OrderProvider'
 import type { PizzaItem } from './OrderProvider'
-import type { OrderData, BackendOrderRequest, MultiplePizzaOrderRequest } from '@/lib/types'
+import type { OrderData, MultiplePizzaOrderRequest } from '@/lib/types'
 import { submitOrder } from '@/lib/api'
 import { useNavigate } from '@tanstack/react-router'
 import { getUserId } from '@/lib/auth'
@@ -25,7 +23,7 @@ interface OrderReviewModalProps {
 }
 
 export const OrderReviewModal: React.FC<OrderReviewModalProps> = ({ isOpen, onClose }) => {
-  const { cart, clearCart, removeDiscount } = useOrder()
+  const { cart, clearCart } = useOrder()
   const navigate = useNavigate()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)

@@ -198,7 +198,7 @@ export function refreshTokenIfNeeded(): boolean {
 }
 
 // No token validation needed for public auth
-export function isValidTokenFormat(token: string): boolean {
+export function isValidTokenFormat(_token: string): boolean {
     // No tokens in public auth
     return false;
 }

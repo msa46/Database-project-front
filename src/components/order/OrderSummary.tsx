@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useOrder } from './OrderProvider'
 import { OrderReviewModal } from './OrderReviewModal'
-import { DiscountCodeInput } from './DiscountCodeInput'
 import type { PizzaItem } from './OrderProvider'
 
 export const OrderSummary: React.FC = () => {

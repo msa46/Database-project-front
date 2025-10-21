@@ -4,17 +4,8 @@ import { useNavigate } from '@tanstack/react-router'
 import { getUserId } from '../lib/auth'
 import { API_URL } from '../lib/api'
 import ky from 'ky'
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { OrderProvider, useOrder } from '@/components/order/OrderProvider'
+import { OrderProvider } from '@/components/order/OrderProvider'
 import { QuantitySelector } from '@/components/order/QuantitySelector'
 import { OrderButton } from '@/components/order/OrderButton'
 import { OrderSummary } from '@/components/order/OrderSummary'

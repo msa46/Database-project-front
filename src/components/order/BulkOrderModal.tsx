@@ -101,7 +101,6 @@ export const BulkOrderModal: React.FC<BulkOrderModalProps> = ({
             {pizzas.map((pizza, index) => {
               const pizzaId = pizza.id || index
               const parsedPrice = parseFloat(pizza.price);
-              const isValidPrice = !isNaN(parsedPrice) && parsedPrice > 0;
               
               return (
                 <div key={pizzaId} className="flex items-center justify-between p-3 border rounded-lg">

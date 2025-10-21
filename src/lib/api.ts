@@ -1,5 +1,5 @@
 import ky from 'ky'
-import type { OrderData, BackendOrderRequest, MultiplePizzaOrderRequest, OrderResponse, CreateDiscountCodeRequest, CreateDiscountCodeResponse, ValidateDiscountCodeRequest, ValidateDiscountCodeResponse } from './types'
+import type { OrderData, BackendOrderRequest, MultiplePizzaOrderRequest, OrderResponse, CreateDiscountCodeRequest, CreateDiscountCodeResponse, ValidateDiscountCodeResponse } from './types'
 
 export const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
