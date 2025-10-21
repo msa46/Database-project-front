@@ -8,7 +8,7 @@ export default function Header() {
 
   const handleLogout = () => {
     logout();
-    navigate({ to: '/' });
+    navigate({ to: '/login' });
   };
 
   const isOnDashboard = location.pathname === '/dashboard';
