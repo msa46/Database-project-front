@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { signup, storeToken } from '@/lib/auth';
+import { signup, storeUser } from '@/lib/auth';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -88,11 +88,10 @@ export function SignupForm() {
       console.log('DEBUG: SignupForm - Processed signup data:', JSON.stringify(signupData, null, 2));
       const response = await signup(signupData);
       console.log('DEBUG: SignupForm - Signup response received:', response);
-      storeToken(response.access_token);
-      
-      // Manually set the access token cookie
-      document.cookie = `access_token=${response.access_token}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
-      console.log('DEBUG: SignupForm - Token stored and cookie set, document cookies after signup:', document.cookie);
+      storeUser(response.id, response.username);
+
+      // No need for cookies since we're using localStorage for user_id
+      console.log('DEBUG: SignupForm - User data stored in localStorage');
       
       setSuccess('Signup successful! Welcome aboard.');
       form.reset();

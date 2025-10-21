@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { login, storeToken } from '@/lib/auth';
+import { login, storeUser } from '@/lib/auth';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 
 const schema = z.object({
   username_or_email: z.string().min(1, { message: 'Username or email is required' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  password: z.string().min(1, { message: 'Password is required' }), // Keep for UI but ignore
 });
 
 type FormData = z.infer<typeof schema>;
@@ -33,27 +33,21 @@ export function LoginForm() {
     setSuccess('');
     try {
       console.log('LoginForm: Submitting login form with data:', data);
-      const response = await login(data);
+
+      // For public auth, we don't need password
+      const loginData = { username_or_email: data.username_or_email };
+      const response = await login(loginData);
+
       console.log('LoginForm: Login response received:', response);
-      console.log('LoginForm: Token from response:', response.access_token);
-      
-      // Check if token was stored correctly
-      const storedToken = localStorage.getItem('auth_token');
-      console.log('LoginForm: Token retrieved from localStorage:', storedToken);
-      
-      // Manually set the access token cookie
-      document.cookie = `access_token=${response.access_token}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
-      console.log('LoginForm: Set cookie with domain attribute');
-      console.log('LoginForm: Document cookies after setting with domain:', document.cookie);
-      
-      // Also try without domain
-      document.cookie = `access_token=${response.access_token}; path=/; SameSite=Lax`;
-      console.log('LoginForm: Set cookie without domain attribute');
-      console.log('LoginForm: Document cookies after setting without domain:', document.cookie);
-      
+      console.log('LoginForm: User ID from response:', response.id);
+      console.log('LoginForm: Username from response:', response.username);
+
+      // Store user data in localStorage (no tokens needed!)
+      storeUser(response.id, response.username);
+
       setSuccess('Login successful!');
       form.reset();
-      
+
       // Redirect to dashboard after successful login
       setTimeout(() => {
         navigate({ to: '/dashboard' });
@@ -93,9 +87,9 @@ export function LoginForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>Password (Any password works!)</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="Password" {...field} />
+                    <Input type="password" placeholder="Any password" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { isAuthenticated, getValidToken, logout } from '../lib/auth'
+import { getUserId } from '../lib/auth'
 import { API_URL } from '../lib/api'
 import ky from 'ky'
 import {
@@ -38,32 +38,28 @@ function Dashboard() {
 
   const fetchDashboardData = async (pageNum: number = 1, append: boolean = false) => {
     try {
-      const token = getValidToken();
-      
+      const userId = getUserId();
+
       console.log('[DIAGNOSTIC] fetchDashboardData called');
-      console.log('[DIAGNOSTIC] Valid token exists:', !!token);
-      
-      // Check if token is valid before making request
-      if (!token) {
-        console.log('[DIAGNOSTIC] No valid token found, redirecting to login');
+      console.log('[DIAGNOSTIC] User ID exists:', !!userId);
+
+      // Check if user_id exists before making request
+      if (!userId) {
+        console.log('[DIAGNOSTIC] No user_id found, redirecting to login');
         navigate({ to: '/login' });
         return;
       }
-      
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      };
-      
-      console.log('[DEBUG] Added Authorization header with token');
-      
-      const url = `${API_URL}/v1/dashboard?page=${pageNum}`;
+
+      console.log('[DEBUG] Using public dashboard endpoint');
+
+      const url = `${API_URL}/v1/public/dashboard/${userId}?page=${pageNum}&page_size=10&dietary_filter=all&available_only=true`;
       console.log('[DEBUG] Dashboard API URL being used:', url);
       console.log('[DEBUG] API_URL from dashboard module:', API_URL);
-      console.log('[DEBUG] Full request headers:', headers);
-      
+
       const response = await ky.get(url, {
-        headers,
+        headers: {
+          'Content-Type': 'application/json'
+        },
         credentials: 'include'
       });
 
@@ -71,14 +67,13 @@ function Dashboard() {
       console.log('[DEBUG] Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
-        // Handle authentication errors by redirecting to login
-        if (response.status === 401 || response.status === 403) {
-          console.log('[DEBUG] Authentication error received, clearing token and redirecting to login');
-          logout(); // Clear the invalid token
+        // Handle user not found errors
+        if (response.status === 404) {
+          console.log('[DEBUG] User not found, redirecting to login');
           navigate({ to: '/login' });
           return;
         }
-        
+
         const errorText = await response.text();
         console.log('[DEBUG] Error response body:', errorText);
         throw new Error(`Failed to fetch dashboard data: ${errorText}`);
@@ -96,38 +91,21 @@ function Dashboard() {
         setDashboardData(data);
       }
       
-      // Extract pizzas from the response
-      console.log('[DEBUG] Extracting pizzas from response data');
-      console.log('[DEBUG] Data type:', typeof data);
-      console.log('[DEBUG] Is data an array?', Array.isArray(data));
+      // Extract pizzas from the public dashboard response
+      console.log('[DEBUG] Extracting pizzas from public dashboard response');
       console.log('[DEBUG] Data keys:', Object.keys(data));
-      
+
+      // Public dashboard returns: { available_pizzas: [...], pizza_pagination: {...} }
       let pizzas = [];
-      if (data.pizzas && Array.isArray(data.pizzas)) {
-        console.log('[DEBUG] Found pizzas in data.pizzas');
-        pizzas = data.pizzas;
-      } else if (Array.isArray(data)) {
-        console.log('[DEBUG] Data itself is an array, using as pizzas');
-        pizzas = data;
-      } else if (data.data && Array.isArray(data.data)) {
-        console.log('[DEBUG] Found pizzas in data.data');
-        pizzas = data.data;
-      } else if (data.items && Array.isArray(data.items)) {
-        console.log('[DEBUG] Found pizzas in data.items');
-        pizzas = data.items;
-      } else if (data.results && Array.isArray(data.results)) {
-        console.log('[DEBUG] Found pizzas in data.results');
-        pizzas = data.results;
+      if (data.available_pizzas && Array.isArray(data.available_pizzas)) {
+        console.log('[DEBUG] Found pizzas in data.available_pizzas');
+        pizzas = data.available_pizzas;
       } else {
-        console.log('[DEBUG] Checking for pizzas in nested arrays');
+        console.log('[DEBUG] No pizzas found in expected location, checking all fields');
         for (const key in data) {
-          console.log(`[DEBUG] Checking key "${key}":`, typeof data[key], Array.isArray(data[key]) ? `array with ${data[key].length} items` : 'not an array');
           if (Array.isArray(data[key]) && data[key].length > 0) {
             const firstItem = data[key][0];
-            console.log(`[DEBUG] First item in "${key}":`, firstItem);
-            if (firstItem && typeof firstItem === 'object' &&
-                (firstItem.name || firstItem.price || firstItem.size || firstItem.toppings)) {
-              console.log(`[DEBUG] Found pizzas in data.${key}`);
+            if (firstItem && typeof firstItem === 'object' && firstItem.name) {
               pizzas = data[key];
               break;
             }
@@ -138,9 +116,14 @@ function Dashboard() {
       console.log('[DEBUG] Extracted pizzas:', pizzas);
       console.log('[DEBUG] Number of pizzas:', pizzas.length);
       
-      // Check if there are more pages
-      const pageSize = 10; // Assuming a page size of 10
-      setHasMore(pizzas.length === pageSize);
+      // Check if there are more pages using public dashboard pagination
+      if (data.pizza_pagination) {
+        setHasMore(data.pizza_pagination.has_next);
+        console.log('[DEBUG] Using pagination info:', data.pizza_pagination);
+      } else {
+        // Fallback: assume no more if we got less than expected
+        setHasMore(pizzas.length >= 10);
+      }
       
       if (append) {
         setAllPizzas(prevPizzas => [...prevPizzas, ...pizzas]);
@@ -171,18 +154,18 @@ function Dashboard() {
   useEffect(() => {
     console.log('[DEBUG] Dashboard useEffect triggered');
     document.title = 'Dashboard'
-    
-    // Check authentication status
-    const token = getValidToken()
-    console.log('[DIAGNOSTIC] Authentication check - valid token exists:', !!token);
-    
-    if (!token) {
-      console.log('[DIAGNOSTIC] No valid token found, redirecting to login')
+
+    // Check if user is logged in (has user_id)
+    const userId = getUserId()
+    console.log('[DIAGNOSTIC] Authentication check - user_id exists:', !!userId);
+
+    if (!userId) {
+      console.log('[DIAGNOSTIC] No user_id found, redirecting to login')
       navigate({ to: '/login' })
       return
     }
 
-    console.log('[DIAGNOSTIC] Authentication passed, fetching dashboard data');
+    console.log('[DIAGNOSTIC] User authenticated, fetching dashboard data');
     fetchDashboardData(1, false)
   }, [navigate])
 

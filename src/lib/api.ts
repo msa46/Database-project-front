@@ -9,27 +9,24 @@ console.log('[DEBUG] API_URL initialized to:', API_URL);
 console.log('[DEBUG] Environment VITE_API_URL:', import.meta.env.VITE_API_URL);
 
 export async function submitOrder(orderData: OrderData | BackendOrderRequest | MultiplePizzaOrderRequest): Promise<OrderResponse> {
+  let userId: string | null = null;
   try {
-    const token = getValidToken()
-    console.log('[DIAGNOSTIC] Submitting order with token:', token ? 'Valid token present' : 'No valid token')
-    console.log('[DIAGNOSTIC] Token value (first 10 chars):', token ? token.substring(0, 10) + '...' : 'N/A')
-    console.log('[DIAGNOSTIC] Token length:', token ? token.length : 0)
-    
-    // Check if token exists and is valid
-    if (!token) {
-      console.error('[DIAGNOSTIC] No valid authentication token found. User may need to log in again.')
+    userId = localStorage.getItem('user_id');
+    console.log('[DIAGNOSTIC] Submitting order for user_id:', userId);
+
+    // Check if user_id exists
+    if (!userId) {
+      console.error('[DIAGNOSTIC] No user_id found. User may need to log in again.')
       return {
         success: false,
-        error: 'Authentication required. Please log in again to place your order.'
+        error: 'Please log in again to place your order.'
       }
     }
     
-    // Log token details for debugging
-    console.log('[DIAGNOSTIC] Token validation details:', {
-      tokenExists: !!token,
-      tokenLength: token ? token.length : 0,
-      tokenStart: token ? token.substring(0, 10) + '...' : 'N/A',
-      tokenFormat: token ? (token.split('.').length === 3 ? 'JWT' : 'Unknown') : 'N/A'
+    // Log user details for debugging
+    console.log('[DIAGNOSTIC] User validation details:', {
+      userIdExists: !!userId,
+      userId: userId
     })
     
     // Enhanced validation of order data
@@ -108,28 +105,26 @@ export async function submitOrder(orderData: OrderData | BackendOrderRequest | M
       }
     }
     
-    console.log('[DEBUG] Full order submission URL:', `${API_URL}/v1/order-pizza-with-extras`)
+    console.log('[DEBUG] Full order submission URL:', `${API_URL}/v1/public/order-multiple-pizzas/${userId}`)
     console.log('[DEBUG] API_URL being used:', API_URL)
-    
-    // Use the correct endpoint for pizza orders with extras
-    console.log('[DEBUG] Using correct endpoint: /v1/order-pizza-with-extras')
-    const endpointUsed = '/v1/order-pizza-with-extras'
-    
-    // Ensure Content-Type header is set
-    console.log('[DIAGNOSTIC] Making POST request to:', `${API_URL}/v1/order-pizza-with-extras`)
+
+    // Use the public endpoint for pizza orders (no auth needed)
+    console.log('[DEBUG] Using public endpoint: /v1/public/order-multiple-pizzas/{user_id}')
+    const endpointUsed = `/v1/public/order-multiple-pizzas/${userId}`
+
+    // No Authorization header needed for public endpoints
+    console.log('[DIAGNOSTIC] Making POST request to:', `${API_URL}/v1/public/order-multiple-pizzas/${userId}`)
     console.log('[DIAGNOSTIC] Request headers:', {
-      'Authorization': `Bearer ${token ? token.substring(0, 10) + '...' : 'N/A'}`,
       'Content-Type': 'application/json',
       'credentials': 'include'
     })
     console.log('[DIAGNOSTIC] Request body:', JSON.stringify(orderData, null, 2))
-    
+
     let response;
     try {
-      response = await ky.post(`${API_URL}/v1/order-pizza-with-extras`, {
+      response = await ky.post(`${API_URL}/v1/public/order-multiple-pizzas/${userId}`, {
         json: orderData,
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         credentials: 'include',
@@ -156,9 +151,8 @@ export async function submitOrder(orderData: OrderData | BackendOrderRequest | M
       if (response.status === 422) {
         console.error('[DEBUG] Unprocessable Entity Error - The server understands the request but cannot process the contained instructions')
         console.error('[DEBUG] Raw error response:', errorText)
-        console.error('[DEBUG] Request URL:', `${API_URL}/v1/order-pizza-with-extras`)
+        console.error('[DEBUG] Request URL:', `${API_URL}/v1/public/order-multiple-pizzas/${userId}`)
         console.error('[DEBUG] Request headers:', {
-          'Authorization': `Bearer ${token ? token.substring(0, 10) + '...' : 'N/A'}`,
           'Content-Type': 'application/json',
           'credentials': 'include'
         })
@@ -188,12 +182,12 @@ export async function submitOrder(orderData: OrderData | BackendOrderRequest | M
         }
       }
       
-      // Handle authentication errors specifically
+      // Handle authentication errors specifically (though shouldn't happen with public endpoints)
       if (response.status === 401 || response.status === 403) {
-        console.error('[DEBUG] Authentication error - token may be expired or invalid')
+        console.error('[DEBUG] Authentication error - user may not exist')
         return {
           success: false,
-          error: 'Your session has expired. Please log in again to place your order.'
+          error: 'User not found. Please log in again to place your order.'
         }
       }
       
@@ -251,7 +245,7 @@ export async function submitOrder(orderData: OrderData | BackendOrderRequest | M
         if (httpError.response?.status === 422) {
           console.error('[DEBUG] Unprocessable Entity Error - The server understands the request but cannot process the contained instructions')
           console.error('[DEBUG] Raw error response:', errorText)
-          console.error('[DEBUG] Request URL:', `${API_URL}/v1/order-pizza-with-extras`)
+          console.error('[DEBUG] Request URL:', `${API_URL}/v1/public/order-multiple-pizzas/${userId}`)
           console.error('[DEBUG] Request body:', JSON.stringify(orderData, null, 2))
           
           try {
@@ -279,12 +273,12 @@ export async function submitOrder(orderData: OrderData | BackendOrderRequest | M
           }
         }
         
-        // Handle authentication errors specifically
+        // Handle authentication errors specifically (though shouldn't happen with public endpoints)
         if (httpError.response?.status === 401 || httpError.response?.status === 403) {
-          console.error('[DEBUG] Authentication error - token may be expired or invalid')
+          console.error('[DEBUG] Authentication error - user may not exist')
           return {
             success: false,
-            error: 'Your session has expired. Please log in again to place your order.'
+            error: 'User not found. Please log in again to place your order.'
           }
         }
         

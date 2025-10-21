@@ -3,7 +3,7 @@ import ky from 'ky';
 
 export interface LoginRequest {
     username_or_email: string;
-    password: string;
+    // No password needed for public auth
 }
 
 export interface SignupRequest {
@@ -22,20 +22,19 @@ export interface SignupRequest {
 }
 
 export interface AuthResponse {
-    access_token: string;
-    token_type: string;
-    expires_in: number;
-    user_id: number;
+    id: number;        // user id
     username: string;
     email: string;
+    user_type: string;
+    // No tokens for public auth!
 }
 
 export async function login(request: LoginRequest): Promise<AuthResponse> {
     console.log('[DEBUG] API_URL from auth module:', API_URL);
-    console.log('[DEBUG] Attempting login to:', `${API_URL}/auth/login`);
+    console.log('[DEBUG] Attempting login to:', `${API_URL}/public-auth/login`);
     console.log('[DEBUG] Login request:', request);
-    
-    const response = await ky.post(`${API_URL}/auth/login`, {
+
+    const response = await ky.post(`${API_URL}/public-auth/login`, {
         json: request,
         credentials: 'include',
     });
@@ -49,22 +48,23 @@ export async function login(request: LoginRequest): Promise<AuthResponse> {
 
     const data = await response.json<AuthResponse>();
     console.log('Login response data:', data);
-    
-    // Store token in localStorage as backup but rely on cookies for authentication
-    if (data.access_token && typeof data.access_token === 'string' && data.access_token.trim() !== '') {
-        console.log('Storing token in localStorage');
-        storeToken(data.access_token);
+
+    // Store user_id in localStorage (no tokens needed!)
+    if (data.id) {
+        console.log('Storing user_id in localStorage:', data.id);
+        localStorage.setItem('user_id', data.id.toString());
+        localStorage.setItem('username', data.username);
     } else {
-        console.error('Invalid token received from login response');
-        throw new Error('Invalid authentication token received');
+        console.error('No user_id received from login response');
+        throw new Error('Invalid login response');
     }
-    
+
     return data;
 }
 
 export async function signup(request: SignupRequest): Promise<AuthResponse> {
     console.log('[DEBUG] API_URL from auth module:', API_URL);
-    console.log('[DEBUG] Attempting signup to:', `${API_URL}/auth/signup`);
+    console.log('[DEBUG] Attempting signup to:', `${API_URL}/public-auth/signup`);
     console.log('[DEBUG] API_URL from environment:', API_URL);
     console.log('DEBUG: Current frontend origin:', window.location.origin);
     console.log('DEBUG: Signup request:', JSON.stringify(request, null, 2));
@@ -80,7 +80,7 @@ export async function signup(request: SignupRequest): Promise<AuthResponse> {
     }
     
     try {
-        console.log('DEBUG: Making POST request to:', `${API_URL}/auth/signup`);
+        console.log('DEBUG: Making POST request to:', `${API_URL}/public-auth/signup`);
         console.log('DEBUG: Request JSON payload:', JSON.stringify({
             ...request,
             // Log the type of each field to help debug type issues
@@ -114,16 +114,17 @@ export async function signup(request: SignupRequest): Promise<AuthResponse> {
 
         const data = await response.json<AuthResponse>();
         console.log('DEBUG: Signup response data:', data);
-        
-        // Store token in localStorage as backup but rely on cookies for authentication
-        if (data.access_token && typeof data.access_token === 'string' && data.access_token.trim() !== '') {
-            console.log('DEBUG: Storing token in localStorage');
-            storeToken(data.access_token);
+
+        // Store user_id in localStorage (no tokens needed for public auth!)
+        if (data.id) {
+            console.log('DEBUG: Storing user_id in localStorage:', data.id);
+            localStorage.setItem('user_id', data.id.toString());
+            localStorage.setItem('username', data.username);
         } else {
-            console.error('DEBUG: Invalid token received from signup response');
-            throw new Error('Invalid authentication token received');
+            console.error('DEBUG: No user_id received from signup response');
+            throw new Error('Invalid signup response');
         }
-        
+
         return data;
     } catch (error) {
         console.error('DEBUG: Signup error caught:', error);
@@ -137,124 +138,72 @@ export async function signup(request: SignupRequest): Promise<AuthResponse> {
     }
 }
 
-const TOKEN_KEY = 'auth_token';
+const USER_ID_KEY = 'user_id';
+const USERNAME_KEY = 'username';
 
 export function storeToken(token: string): void {
     if (!token || typeof token !== 'string' || token.trim() === '') {
         console.error('Attempted to store invalid token');
         throw new Error('Cannot store invalid token');
     }
-    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem('auth_token', token);
 }
 
-export function getToken(): string | null {
-    const token = localStorage.getItem(TOKEN_KEY);
-    console.log('[DEBUG] getToken called. Token exists:', !!token);
-    if (token) {
-        console.log('[DEBUG] Token length:', token.length);
-        console.log('[DEBUG] Token starts with:', token.substring(0, 10) + '...');
+export function storeUser(userId: number, username: string): void {
+    if (!userId || isNaN(userId)) {
+        console.error('Attempted to store invalid user_id');
+        throw new Error('Cannot store invalid user_id');
     }
-    return token;
+    localStorage.setItem(USER_ID_KEY, userId.toString());
+    localStorage.setItem(USERNAME_KEY, username);
+}
+
+export function getUserId(): number | null {
+    const userId = localStorage.getItem(USER_ID_KEY);
+    console.log('[DEBUG] getUserId called. User ID exists:', !!userId);
+    if (userId) {
+        const id = parseInt(userId, 10);
+        console.log('[DEBUG] User ID:', id);
+        return id;
+    }
+    return null;
+}
+
+export function getUsername(): string | null {
+    return localStorage.getItem(USERNAME_KEY);
 }
 
 export function isAuthenticated(): boolean {
-    const token = getToken();
-    console.log('Checking authentication. Token in localStorage:', token ? 'exists' : 'not found');
-    // Check for token in localStorage as backup
-    // The primary authentication should be handled by cookies
-    return token !== null && typeof token === 'string' && token.trim() !== '';
+    const userId = getUserId();
+    console.log('Checking authentication. User ID in localStorage:', userId);
+    return userId !== null && !isNaN(userId);
 }
 
 export function logout(): void {
-    console.log('[DEBUG] Logging out, removing token from localStorage')
-    localStorage.removeItem(TOKEN_KEY);
+    console.log('[DEBUG] Logging out, removing user data from localStorage')
+    localStorage.removeItem(USER_ID_KEY);
+    localStorage.removeItem(USERNAME_KEY);
 }
 
+// Since we're not using tokens anymore, these functions are simplified
 export function isTokenExpired(): boolean {
-    const token = getToken();
-    if (!token) {
-        console.log('[DIAGNOSTIC] isTokenExpired: No token found, returning true');
-        return true;
-    }
-    
-    try {
-        console.log('[DIAGNOSTIC] isTokenExpired: Checking token expiration');
-        console.log('[DIAGNOSTIC] Token format check - has 3 parts:', token.split('.').length === 3);
-        
-        // Simple JWT token parsing to check expiration
-        const parts = token.split('.');
-        console.log('[DIAGNOSTIC] Token parts:', parts.map((part, i) => `Part ${i}: ${part.substring(0, 20)}...`));
-        
-        const payload = JSON.parse(atob(parts[1]));
-        console.log('[DIAGNOSTIC] Token payload:', payload);
-        
-        const currentTime = Date.now() / 1000;
-        console.log('[DIAGNOSTIC] Current time (Unix timestamp):', currentTime);
-        console.log('[DIAGNOSTIC] Token expiration time:', payload.exp);
-        console.log('[DIAGNOSTIC] Token expired?', payload.exp < currentTime);
-        console.log('[DIAGNOSTIC] Time until expiration (seconds):', payload.exp - currentTime);
-        
-        return payload.exp < currentTime;
-    } catch (error) {
-        console.error('[DIAGNOSTIC] Error parsing token:', error);
-        console.error('[DIAGNOSTIC] Token that failed to parse:', token.substring(0, 50) + '...');
-        return true; // If we can't parse the token, assume it's expired
-    }
+    // No tokens to expire in public auth
+    return false;
 }
 
 export function refreshTokenIfNeeded(): boolean {
-    if (isTokenExpired()) {
-        console.log('[DIAGNOSTIC] Token is expired, logging out');
-        logout();
-        return false;
-    }
+    // No tokens to refresh in public auth
     return true;
 }
 
-// New function to validate token format
+// No token validation needed for public auth
 export function isValidTokenFormat(token: string): boolean {
-    if (!token || typeof token !== 'string') {
-        console.log('[DIAGNOSTIC] Invalid token: not a string or empty');
-        return false;
-    }
-    
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-        console.log('[DIAGNOSTIC] Invalid token format: does not have 3 parts');
-        return false;
-    }
-    
-    try {
-        // Try to parse the payload
-        JSON.parse(atob(parts[1]));
-        return true;
-    } catch (error) {
-        console.log('[DIAGNOSTIC] Invalid token: payload cannot be parsed');
-        return false;
-    }
+    // No tokens in public auth
+    return false;
 }
 
-// Enhanced getToken function with validation
+// No token needed for public auth
 export function getValidToken(): string | null {
-    const token = getToken();
-    
-    if (!token) {
-        console.log('[DIAGNOSTIC] getValidToken: No token found');
-        return null;
-    }
-    
-    if (!isValidTokenFormat(token)) {
-        console.log('[DIAGNOSTIC] getValidToken: Invalid token format, removing and returning null');
-        logout();
-        return null;
-    }
-    
-    if (isTokenExpired()) {
-        console.log('[DIAGNOSTIC] getValidToken: Token is expired, removing and returning null');
-        logout();
-        return null;
-    }
-    
-    console.log('[DIAGNOSTIC] getValidToken: Token is valid');
-    return token;
+    // No tokens in public auth - return null
+    return null;
 }

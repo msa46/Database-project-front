@@ -14,7 +14,7 @@ import type { PizzaItem } from './OrderProvider'
 import type { OrderData, BackendOrderRequest, MultiplePizzaOrderRequest } from '@/lib/types'
 import { submitOrder } from '@/lib/api'
 import { useNavigate } from '@tanstack/react-router'
-import { getValidToken } from '@/lib/auth'
+import { getUserId } from '@/lib/auth'
 
 interface OrderReviewModalProps {
   isOpen: boolean
@@ -30,10 +30,10 @@ export const OrderReviewModal: React.FC<OrderReviewModalProps> = ({ isOpen, onCl
   const handlePlaceOrder = async () => {
     console.log('[DIAGNOSTIC] Order submission started')
     
-    // Check authentication before proceeding
-    const token = getValidToken()
-    if (!token) {
-      console.log('[DIAGNOSTIC] No valid token found, cannot place order')
+    // Check if user is logged in before proceeding
+    const userId = getUserId()
+    if (!userId) {
+      console.log('[DIAGNOSTIC] No user_id found, cannot place order')
       setError('You must be logged in to place an order.')
       setTimeout(() => {
         if (confirm('You need to log in to place an order. Would you like to log in now?')) {
@@ -255,17 +255,15 @@ export const OrderReviewModal: React.FC<OrderReviewModalProps> = ({ isOpen, onCl
       } else {
         console.log('[DEBUG] Order failed with error:', response.error)
         
-        // Check if it's an authentication error
-        if (response.error?.includes('session has expired') ||
-            response.error?.includes('Authentication required') ||
-            response.error?.includes('log in again') ||
-            response.error?.includes('token')) {
-          console.log('[DEBUG] Authentication error detected, redirecting to login')
+        // Check if it's a user error
+        if (response.error?.includes('User not found') ||
+            response.error?.includes('log in again')) {
+          console.log('[DEBUG] User error detected, redirecting to login')
           setError(response.error)
-          
+
           // Provide option to redirect to login
           setTimeout(() => {
-            if (confirm('Your session has expired. Would you like to log in again?')) {
+            if (confirm('Please log in again to place your order.')) {
               navigate({ to: '/login' })
             }
           }, 1000)
