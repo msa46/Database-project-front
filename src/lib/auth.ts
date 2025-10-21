@@ -90,7 +90,7 @@ export async function signup(request: SignupRequest): Promise<AuthResponse> {
             }, {} as Record<string, string>)
         }, null, 2));
         
-        const response = await ky.post(`${API_URL}/auth/signup`, {
+        const response = await ky.post(`${API_URL}/public-auth/signup`, {
             json: request,
             credentials: 'include',
         });
